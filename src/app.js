@@ -1,3 +1,27 @@
+import React, { useState, useEffect } from 'react';
+import Onboarding from './components/Onboarding';
+
+function App() {
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  // Optional: Use localStorage so it only shows once per device
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('radix-onboarded');
+    if (hasSeen) setShowWelcome(false);
+  }, []);
+
+  const handleDismiss = () => {
+    setShowWelcome(false);
+    localStorage.setItem('radix-onboarded', 'true');
+  };
+
+  return (
+    <div>
+      {showWelcome && <Onboarding onDismiss={handleDismiss} />}
+      {/* Rest of your App.js code here... */}
+    </div>
+  );
+}
 import React, { useState } from 'react';
 import scenarios from './data/scenarios.json';
 
