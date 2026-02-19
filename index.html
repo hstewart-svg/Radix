@@ -3,28 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix | Executive Architect</title>
+    <title>Radix | Capacity Architect</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        body { 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            letter-spacing: 0.015em;
-        }
-        .architect-logo {
-            filter: drop-shadow(0 4px 6px rgba(79, 70, 229, 0.15));
-        }
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .maturity-progress {
-            transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.015em; }
+        .capacity-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
 <body class="bg-[#fcfdfe] text-slate-800">
@@ -36,75 +23,53 @@
         const App = () => {
             const [view, setView] = useState('home');
             
-            // CORE RCM DATA - Focused on European Expansion
+            // 1. GOVERNANCE & ECONOMICS (THE LEVERS)
+            const [levers, setLevers] = useState({
+                internalRate: 125,
+                externalRate: 250,
+                ebitdaBase: 41218000,
+                autoTargetHours: 2 // Targeted hours for an automated ITAC
+            });
+
+            // 2. RCM DNA (Capturing specific Hours per Control)
             const [rcmData, setRcmData] = useState([
-                { id: 1, region: "Europe", country: "United Kingdom", process: "Procure to Pay", sub: "Invoice Processing", assertion: "Completeness", type: "Manual", risk: 85, judgment: 30, status: "Decentralized" },
-                { id: 2, region: "Europe", country: "Germany", process: "Record to Report", sub: "Journal Entries", assertion: "Existence", type: "Manual", risk: 90, judgment: 85, status: "Decentralized" },
-                { id: 3, region: "Europe", country: "France", process: "Procure to Pay", sub: "Vendor Master", assertion: "Validity", type: "Manual", risk: 75, judgment: 40, status: "Decentralized" },
-                { id: 4, region: "Europe", country: "Italy", process: "Order to Cash", sub: "Revenue Recognition", assertion: "Valuation", type: "Manual", risk: 95, judgment: 90, status: "Decentralized" },
-                { id: 5, region: "Europe", country: "Spain", process: "Hire to Retire", sub: "Payroll", assertion: "Accuracy", type: "ITAC", risk: 20, judgment: 10, status: "Optimized" }
+                { id: 1, country: "USA", sub: "Invoice Matching", type: "Manual", manualHours: 60, resource: "Internal" },
+                { id: 2, country: "UK", sub: "Journal Entries", type: "Manual", manualHours: 45, resource: "External" },
+                { id: 3, country: "Germany", sub: "Inventory Counts", type: "Manual", manualHours: 80, resource: "External" }
             ]);
 
-            // ARCHITECTURAL CALCULATIONS
-            const stats = useMemo(() => {
-                const total = rcmData.length;
-                const standardized = rcmData.filter(c => c.status === "Standardized" || c.status === "Optimized").length;
-                const automated = rcmData.filter(c => c.type === "ITAC").length;
+            // 3. CAPACITY ENGINE
+            const analysis = useMemo(() => {
+                const totalManualHours = rcmData.reduce((acc, c) => acc + (c.type === "Manual" ? c.manualHours : levers.autoTargetHours), 0);
                 
-                // Digital Maturity Score: Weighted average of Standardized (40%) and Automated (60%)
-                const maturityScore = Math.round(((standardized / total) * 40) + ((automated / total) * 60));
-                
-                // Control Debt: Estimated based on manual testing overhead
-                const manualNodes = rcmData.filter(c => c.type === "Manual").length;
-                const debtValue = manualNodes * 8400; // Blended annual debt per manual node
+                const controlDebt = rcmData.reduce((acc, c) => {
+                    if (c.type === "Manual") {
+                        const rate = c.resource === "Internal" ? levers.internalRate : levers.externalRate;
+                        const wastedHours = c.manualHours - levers.autoTargetHours;
+                        return acc + (wastedHours * rate);
+                    }
+                    return acc;
+                }, 0);
 
-                return { maturityScore, debtValue, total, standardized, automated };
-            }, [rcmData]);
+                const hoursSaved = rcmData.reduce((acc, c) => {
+                    return acc + (c.type === "ITAC" ? (c.manualHours - levers.autoTargetHours) : 0);
+                }, 0);
 
-            const StructuralLogo = () => (
-                <div className="architect-logo flex items-center gap-3">
-                    <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="8" y="8" width="6" height="24" rx="1" fill="#4F46E5"/>
-                        <path d="M14 8H24C28.4 8 32 11.6 32 16C32 20.4 28.4 24 24 24H14V8Z" fill="#4F46E5" fillOpacity="0.8"/>
-                        <path d="M22 24L30 32H22L14 24H22Z" fill="#4F46E5"/>
-                    </svg>
-                    <span className="text-xl font-extrabold tracking-tight text-slate-900 italic">Radix <span className="text-indigo-600">Architect</span></span>
-                </div>
-            );
-
-            const Tile = ({ title, sub, icon, target, accent }) => (
-                <button 
-                    onClick={() => setView(target)} 
-                    className="group bg-white p-12 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 text-left relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 group-hover:bg-indigo-50/50 transition-colors duration-500"></div>
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 relative z-10 transition-transform group-hover:scale-110 ${accent}`}>
-                        {icon}
-                    </div>
-                    <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-2 relative z-10 italic">{title}</h3>
-                    <p className="text-sm text-slate-500 font-medium leading-relaxed relative z-10">{sub}</p>
-                </button>
-            );
+                return { totalManualHours, controlDebt, hoursSaved };
+            }, [rcmData, levers]);
 
             return (
                 <div className="min-h-screen">
-                    {/* Executive Header */}
-                    <nav className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-slate-100 px-10 py-6">
+                    <nav className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 border-b border-slate-100 px-10 py-5">
                         <div className="max-w-7xl mx-auto flex justify-between items-center">
-                            <button onClick={() => setView('home')}><StructuralLogo /></button>
-                            <div className="flex items-center gap-10">
-                                <div className="hidden md:block text-right">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Digital Maturity</p>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-32 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                            <div className="maturity-progress bg-emerald-500 h-full" style={{ width: `${stats.maturityScore}%` }}></div>
-                                        </div>
-                                        <span className="text-sm font-extrabold text-emerald-600 italic">{stats.maturityScore}%</span>
-                                    </div>
-                                </div>
-                                {view !== 'home' && (
-                                    <button onClick={() => setView('home')} className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors">Portal Home</button>
-                                )}
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold italic">R</div>
+                                <span className="text-xl font-extrabold text-slate-900 italic">Radix <span className="text-indigo-600">Architect</span></span>
+                            </div>
+                            <div className="flex gap-8">
+                                <button onClick={() => setView('config')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='config'?'text-indigo-600':'text-slate-400'}`}>Rates & Targets</button>
+                                <button onClick={() => setView('ingest')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600':'text-slate-400'}`}>Capacity Mapping</button>
+                                <button onClick={() => setView('home')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='home'?'text-indigo-600':'text-slate-400'}`}>Portal</button>
                             </div>
                         </div>
                     </nav>
@@ -112,151 +77,104 @@
                     <main className="max-w-7xl mx-auto p-12">
                         {view === 'home' && (
                             <div className="space-y-12">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                                    <Tile 
-                                        title="Regional Heatmap" 
-                                        sub="Visualize global fragility across your European and Americas entities." 
-                                        target="heatmap" 
-                                        accent="bg-rose-50 text-rose-600 shadow-inner"
-                                        icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6"><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path d="M3.6 9h16.8M3.6 15h16.8"/></svg>}
-                                    />
-                                    <Tile 
-                                        title="Bifurcation Architect" 
-                                        sub="Unearth decentralized lineage and retire Control Debt via standardization." 
-                                        target="bifurcator" 
-                                        accent="bg-amber-50 text-amber-600 shadow-inner"
-                                        icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6"><path d="M13 3v6h8V3h-8zm0 18h8v-6h-8v6zM3 21h8v-6H3v6zM3 3v6h8V3H3z"/></svg>}
-                                    />
-                                    <Tile 
-                                        title="Maturity Diagnostic" 
-                                        sub="Analyze the transition from manual friction to structural resilience." 
-                                        target="heatmap" 
-                                        accent="bg-emerald-50 text-emerald-600 shadow-inner"
-                                        icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>}
-                                    />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Audit Hours</p>
+                                        <p className="text-4xl font-extrabold text-slate-900 italic">{analysis.totalManualHours}h</p>
+                                    </div>
+                                    <div className="bg-indigo-950 p-10 rounded-[2.5rem] text-white shadow-xl">
+                                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Capacity Reclaimed</p>
+                                        <p className="text-4xl font-extrabold text-emerald-400 italic">+{analysis.hoursSaved}h</p>
+                                    </div>
+                                    <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Cost of Debt</p>
+                                        <p className="text-4xl font-extrabold text-rose-500 italic">${Math.round(analysis.controlDebt).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <button onClick={()=>setView('ingest')} className="bg-white p-12 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-500 transition-all text-left group shadow-sm">
+                                        <h3 className="text-2xl font-extrabold italic mb-2">Capacity Mapping</h3>
+                                        <p className="text-sm text-slate-400">Capture the specific hours required for manual testing vs. automated targets.</p>
+                                    </button>
+                                    <button onClick={()=>setView('config')} className="bg-white p-12 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-500 transition-all text-left shadow-sm">
+                                        <h3 className="text-2xl font-extrabold italic mb-2">Rates & Levers</h3>
+                                        <p className="text-sm text-slate-400">Define internal vs. external resource costs and ITAC hour targets.</p>
+                                    </button>
                                 </div>
                             </div>
                         )}
 
-                        {view === 'heatmap' && (
-                            <div className="space-y-12 animate-in fade-in duration-1000">
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight italic mb-2 text-indigo-950">Regional Fragility</h2>
-                                        <p className="text-slate-500 font-medium">European entity risk distribution based on Manual Control density.</p>
-                                    </div>
-                                    <div className="bg-white px-8 py-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-6">
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Maturity Score</p>
-                                            <p className="text-3xl font-extrabold text-emerald-600 italic">{stats.maturityScore}%</p>
+                        {view === 'config' && (
+                            <div className="bg-white p-12 rounded-[3rem] border shadow-sm animate-in fade-in duration-500">
+                                <h2 className="text-3xl font-extrabold italic mb-10 text-indigo-950">Resource Economics</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Internal IA Rate ($/hr)</label>
+                                            <input type="number" value={levers.internalRate} onChange={e=>setLevers({...levers, internalRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
                                         </div>
-                                        <div className="h-10 w-px bg-slate-100"></div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Control Debt</p>
-                                            <p className="text-3xl font-extrabold text-rose-500 italic">${stats.debtValue.toLocaleString()}</p>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">External Audit Rate ($/hr)</label>
+                                            <input type="number" value={levers.externalRate} onChange={e=>setLevers({...levers, externalRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
                                         </div>
                                     </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                                    {rcmData.map((c) => (
-                                        <div key={c.id} className={`p-8 rounded-[2.5rem] border-2 transition-all ${c.type === 'ITAC' ? 'bg-emerald-50 border-emerald-100 shadow-sm' : 'bg-white border-slate-50 shadow-md'}`}>
-                                            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[0.2em] mb-4">{c.country}</p>
-                                            <div className="mb-8">
-                                                <div className="flex justify-between items-end mb-2">
-                                                    <span className="text-sm font-bold text-slate-800">Fragility</span>
-                                                    <span className={`text-xl font-extrabold italic ${c.risk > 80 ? 'text-rose-500' : 'text-emerald-500'}`}>{c.type === 'ITAC' ? '15%' : `${c.risk}%`}</span>
-                                                </div>
-                                                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                                                    <div className={`h-full transition-all duration-1000 ${c.risk > 80 ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ width: c.type === 'ITAC' ? '15%' : `${c.risk}%` }}></div>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col gap-2">
-                                                <span className="text-[9px] font-bold text-slate-400 uppercase italic">Key Assertion: {c.assertion}</span>
-                                                <span className={`text-[10px] font-extrabold uppercase tracking-widest ${c.status === 'Optimized' ? 'text-emerald-600' : 'text-indigo-600'}`}>{c.status}</span>
-                                            </div>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Automated Control Target (Hours)</label>
+                                            <input type="number" value={levers.autoTargetHours} onChange={e=>setLevers({...levers, autoTargetHours: Number(e.target.value)})} className="w-full p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-100 font-bold text-indigo-600" />
+                                            <p className="mt-2 text-[10px] text-slate-400 italic">Total hours to query system metadata vs. full manual walk-through.</p>
                                         </div>
-                                    ))}
-                                </div>
-
-                                <div className="bg-indigo-950 p-12 rounded-[3.5rem] text-white relative overflow-hidden shadow-2xl">
-                                    <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full -mr-32 -mt-32"></div>
-                                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-10">
-                                        <div className="max-w-lg">
-                                            <h3 className="text-3xl font-extrabold italic mb-4">Architectural Guidance</h3>
-                                            <p className="text-indigo-100 leading-relaxed font-medium">
-                                                By centralizing the Journal Entry sub-process in Germany and Italy into a Global COE, you would increase Digital Maturity by 12 points and retire ${Math.round(8400 * 2).toLocaleString()} in annual Control Debt.
-                                            </p>
-                                        </div>
-                                        <button 
-                                            onClick={() => setView('bifurcator')}
-                                            className="bg-white text-indigo-950 px-12 py-5 rounded-2xl font-extrabold tracking-wide hover:bg-indigo-50 transition-all shadow-xl shadow-indigo-900/40"
-                                        >
-                                            View Lineage Details
-                                        </button>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {view === 'bifurcator' && (
-                            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
-                                <div className="flex justify-between items-end mb-12">
-                                    <div>
-                                        <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight italic mb-2">Bifurcation Architect</h2>
-                                        <p className="text-slate-500 font-medium">Mapping decentralized European lineage to identify standardization targets.</p>
-                                    </div>
+                        {view === 'ingest' && (
+                            <div className="space-y-8 animate-in fade-in duration-500">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-3xl font-extrabold italic text-indigo-950">Capacity Ingest</h2>
+                                    <button onClick={() => setRcmData([...rcmData, {id: Date.now(), country: "Entity", sub: "New Process", type: "Manual", manualHours: 40, resource: "Internal"}])} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg">Add Control Node</button>
                                 </div>
-                                <div className="bg-white rounded-[3rem] shadow-xl border border-slate-100 overflow-hidden">
+                                <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
                                     <table className="w-full text-left">
-                                        <thead className="bg-slate-50/50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                             <tr>
-                                                <th className="px-12 py-8">Process / Sub-Process</th>
-                                                <th className="px-12 py-8 text-center">Entity Location</th>
-                                                <th className="px-12 py-8">Testing Burden</th>
-                                                <th className="px-12 py-8 text-right">Strategic Action</th>
+                                                <th className="px-10 py-6">Process Node</th>
+                                                <th className="px-10 py-6">Resource Type</th>
+                                                <th className="px-10 py-6">Manual Hours/Year</th>
+                                                <th className="px-10 py-6">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {rcmData.map((c) => (
-                                                <tr key={c.id} className="hover:bg-slate-50 transition-colors group">
-                                                    <td className="px-12 py-8">
-                                                        <p className="font-extrabold text-slate-900 text-base mb-1 italic uppercase">{c.process}</p>
-                                                        <p className="text-sm text-slate-400 font-medium">{c.sub}</p>
+                                            {rcmData.map((c, i) => (
+                                                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-10 py-6">
+                                                        <p className="font-extrabold text-slate-900 mb-1 italic">{c.sub}</p>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{c.country}</span>
                                                     </td>
-                                                    <td className="px-12 py-8 text-center">
-                                                        <span className={`px-4 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${c.status === 'Optimized' ? 'bg-emerald-600 text-white' : 'bg-slate-50 text-slate-600 border border-slate-100 shadow-sm'}`}>
-                                                            {c.country}
-                                                        </span>
+                                                    <td className="px-10 py-6">
+                                                        <select 
+                                                            value={c.resource} 
+                                                            onChange={e=>{const n=[...rcmData]; n[i].resource=e.target.value; setRcmData(n)}}
+                                                            className="bg-transparent font-bold text-xs text-indigo-600 border-none outline-none"
+                                                        >
+                                                            <option value="Internal">Internal (IA)</option>
+                                                            <option value="External">External (Partner)</option>
+                                                        </select>
                                                     </td>
-                                                    <td className="px-12 py-8">
-                                                        <div className="flex flex-col">
-                                                            <span className={`font-extrabold italic ${c.type === 'ITAC' ? 'text-emerald-500' : 'text-slate-900'}`}>{c.type === 'ITAC' ? 'n=1' : 'n=40'}</span>
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase">{c.type === 'ITAC' ? 'System Query' : 'Manual Sample'}</span>
+                                                    <td className="px-10 py-6">
+                                                        <div className="flex items-center gap-2">
+                                                            <input type="number" value={c.manualHours} onChange={e=>{const n=[...rcmData]; n[i].manualHours=Number(e.target.value); setRcmData(n)}} className="w-16 bg-slate-50 p-2 rounded-lg font-bold text-slate-700" />
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Hours</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-12 py-8 text-right">
-                                                        {c.status === 'Decentralized' ? (
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setRcmData(rcmData.map(item => item.id === c.id ? {...item, status: 'Standardized', country: 'Global COE'} : item));
-                                                                }}
-                                                                className="text-xs font-extrabold text-indigo-600 hover:text-indigo-800 transition-colors underline underline-offset-4"
-                                                            >
-                                                                Standardize Node
-                                                            </button>
-                                                        ) : c.status === 'Standardized' ? (
-                                                            <button 
-                                                                onClick={() => {
-                                                                    setRcmData(rcmData.map(item => item.id === c.id ? {...item, type: 'ITAC', status: 'Optimized'} : item));
-                                                                }}
-                                                                className="text-xs font-extrabold text-emerald-600 hover:text-emerald-800 transition-colors underline underline-offset-4"
-                                                            >
-                                                                Automate Control
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-[10px] font-extrabold text-slate-300 uppercase tracking-widest">Resilient</span>
-                                                        )}
+                                                    <td className="px-10 py-6">
+                                                        <button 
+                                                            onClick={()=>{const n=[...rcmData]; n[i].type='ITAC'; setRcmData(n)}}
+                                                            className={`text-[10px] font-extrabold uppercase tracking-widest underline underline-offset-4 ${c.type === 'ITAC' ? 'text-slate-300 pointer-events-none' : 'text-emerald-600'}`}
+                                                        >
+                                                            {c.type === 'ITAC' ? 'Automated' : 'Retire Debt'}
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
