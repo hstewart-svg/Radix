@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix | Process Transformation</title>
+    <title>Radix | Transformation Architect</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -29,17 +29,12 @@
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .card-shadow:hover {
-            box-shadow: 0 25px 50px -12px rgba(79, 70, 229, 0.1);
-            transform: translateY(-4px);
-        }
-
-        input, select, textarea {
-            font-family: 'Plus Jakarta Sans', sans-serif !important;
-            letter-spacing: 0.025em !important;
-        }
-
         .text-header { font-weight: 800; font-style: italic; letter-spacing: -0.02em; }
+        
+        /* Custom Scrollbar for the long activity descriptions */
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -59,20 +54,26 @@
                 coeEfficiencyLift: 35
             });
 
-            // 2. RCM DNA STATE (Explicitly Hierarchical)
+            // 2. RCM DNA STATE
             const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "P2P", process: "AP", activity: "Payment Run Review", country: "Italy", execH: 120, status: "Local", complexity: 1.2 },
-                { id: 2, cycle: "P2P", process: "AP", activity: "Payment Run Review", country: "Germany", execH: 110, status: "Local", complexity: 1.0 },
-                { id: 3, cycle: "R2R", process: "GL", activity: "Manual JE Approval", country: "Germany", execH: 90, status: "Local", complexity: 1.5 },
-                { id: 4, cycle: "R2R", process: "GL", activity: "Manual JE Approval", country: "UK", execH: 85, status: "Local", complexity: 1.1 }
+                { 
+                    id: 1, cycle: "P2P", process: "AP", subProcess: "Payment Processing", controlName: "PMT-01", 
+                    activity: "Manager reviews the payment proposal report and matches totals to the underlying invoice register before releasing funds.",
+                    country: "Italy", execH: 120, status: "Local", complexity: 1.2, frequency: "Weekly", nature: "Manual"
+                },
+                { 
+                    id: 2, cycle: "P2P", process: "AP", subProcess: "Payment Processing", controlName: "PMT-01", 
+                    activity: "Local controller validates payment batches against bank transmission files.",
+                    country: "Germany", execH: 110, status: "Local", complexity: 1.0, frequency: "Weekly", nature: "Manual"
+                }
             ]);
 
-            // 3. ANALYTICS: FRAGMENTATION DISCOVERY
+            // 3. ANALYTICS: FRAGMENTATION DISCOVERY (Grouped by Control Name)
             const fragments = useMemo(() => {
                 const map = {};
                 rcmData.forEach(item => {
-                    if (!map[item.activity]) map[item.activity] = [];
-                    map[item.activity].push(item);
+                    if (!map[item.controlName]) map[item.controlName] = [];
+                    map[item.controlName].push(item);
                 });
                 return map;
             }, [rcmData]);
@@ -91,7 +92,6 @@
                 }, { opSavings: 0 });
             }, [rcmData, levers]);
 
-            // 5. DATA MUTATIONS
             const updateNode = (id, field, value) => {
                 setRcmData(rcmData.map(n => n.id === id ? { ...n, [field]: value } : n));
             };
@@ -106,7 +106,7 @@
                     <div className="flex flex-col">
                         <span className="text-2xl text-header text-slate-900 leading-none">Radix</span>
                         <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mt-1">
-                            {view === 'home' ? 'Fragmentation Map' : view === 'ingest' ? 'Bifurcation Architect' : 'Baseline Modeling'}
+                            {view === 'home' ? 'Fragmentation Map' : view === 'ingest' ? 'Audit Architect' : 'Baseline Modeling'}
                         </span>
                     </div>
                 </div>
@@ -118,69 +118,65 @@
                         <button onClick={() => setView('home')}><StructuralLogo /></button>
                         <div className="flex gap-12">
                             <button onClick={() => setView('home')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='home'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400 hover:text-indigo-400'}`}>Map</button>
-                            <button onClick={() => setView('ingest')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400 hover:text-indigo-400'}`}>Bifurcation</button>
+                            <button onClick={() => setView('ingest')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400 hover:text-indigo-400'}`}>Ingest DNA</button>
                             <button onClick={() => setView('config')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='config'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400 hover:text-indigo-400'}`}>Baseline</button>
                         </div>
                     </nav>
 
                     <main className="max-w-7xl mx-auto p-12 space-y-16">
                         {view === 'home' && (
-                            <div className="space-y-16 animate-in fade-in duration-1000">
-                                {/* DYNAMIC EDITABLE FRAGMENTATION MAP */}
-                                <div className="space-y-8">
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <h2 className="text-4xl text-header text-slate-900 mb-2">Process Fragmentation</h2>
-                                            <p className="text-slate-500 font-medium">Click on any activity node to adjust local parameters or complexity weights.</p>
-                                        </div>
-                                        <div className="bg-indigo-950 px-10 py-6 rounded-3xl text-white card-shadow border-l-4 border-emerald-400">
-                                            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">Total Operational ROI</p>
-                                            <p className="text-4xl text-header text-emerald-400 tracking-tighter italic">${Math.round(analysis.opSavings).toLocaleString()}</p>
-                                        </div>
+                            <div className="space-y-16 animate-in fade-in duration-700">
+                                <div className="flex justify-between items-end">
+                                    <div>
+                                        <h2 className="text-4xl text-header text-slate-900 mb-2">Process Fragmentation</h2>
+                                        <p className="text-slate-500 font-medium italic">Grouping identical Control Names across the global landscape.</p>
                                     </div>
+                                    <div className="bg-indigo-950 px-10 py-6 rounded-3xl text-white card-shadow border-l-4 border-emerald-400">
+                                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1 italic">Operational Dividend</p>
+                                        <p className="text-4xl text-header text-emerald-400 tracking-tighter italic">${Math.round(analysis.opSavings).toLocaleString()}</p>
+                                    </div>
+                                </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        {Object.entries(fragments).map(([activity, nodes]) => (
-                                            <div key={activity} className={`p-10 rounded-[3rem] border-2 card-shadow ${nodes.length > 1 ? 'border-rose-100 bg-rose-50/20' : 'border-slate-100 bg-white'}`}>
-                                                <div className="flex justify-between items-start mb-8">
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.2em] mb-2">Activity DNA</p>
-                                                        <h3 className="text-2xl text-header text-slate-900">{activity}</h3>
-                                                    </div>
-                                                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase ${nodes.length > 1 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                                                        {nodes.length > 1 ? `Fragmented: ${nodes.length} Sites` : 'Standardized'}
-                                                    </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {Object.entries(fragments).map(([controlName, nodes]) => (
+                                        <div key={controlName} className={`p-10 rounded-[3rem] border-2 card-shadow bg-white ${nodes.length > 1 ? 'border-rose-100 shadow-rose-100/20' : 'border-slate-100'}`}>
+                                            <div className="flex justify-between items-start mb-8">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.2em] mb-1">Control Name</p>
+                                                    <h3 className="text-2xl text-header text-slate-900">{controlName}</h3>
                                                 </div>
+                                                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase ${nodes.length > 1 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                    {nodes.length > 1 ? `Fragmented: ${nodes.length} Countries` : 'Standardized'}
+                                                </span>
+                                            </div>
 
-                                                <div className="space-y-6">
-                                                    {nodes.map(node => (
-                                                        <div key={node.id} className="bg-white/80 p-6 rounded-3xl border border-slate-100 grid grid-cols-12 gap-4 items-center">
-                                                            <div className="col-span-3">
-                                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Entity</label>
-                                                                <input value={node.country} onChange={e => updateNode(node.id, 'country', e.target.value)} className="w-full text-xs font-bold text-slate-800 focus:outline-none border-b border-transparent focus:border-indigo-400 bg-transparent" />
-                                                            </div>
-                                                            <div className="col-span-3">
-                                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Exec Hours</label>
-                                                                <input type="number" value={node.execH} onChange={e => updateNode(node.id, 'execH', Number(e.target.value))} className="w-full text-xs font-bold text-slate-800 focus:outline-none bg-transparent" />
-                                                            </div>
-                                                            <div className="col-span-3 text-center">
-                                                                <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Complexity (C)</label>
-                                                                <input type="number" step="0.1" value={node.complexity} onChange={e => updateNode(node.id, 'complexity', Number(e.target.value))} className="w-16 text-xs font-bold text-indigo-600 focus:outline-none bg-transparent text-center" />
-                                                            </div>
-                                                            <div className="col-span-3 text-right">
-                                                                <button 
-                                                                    onClick={() => updateNode(node.id, 'status', node.status === 'Local' ? 'COE' : 'Local')}
-                                                                    className={`text-[10px] font-bold uppercase tracking-widest ${node.status === 'Local' ? 'text-indigo-600 underline' : 'text-emerald-500 font-black'}`}
-                                                                >
-                                                                    {node.status === 'Local' ? 'Shift to COE' : '✓ In COE'}
-                                                                </button>
+                                            <div className="space-y-6">
+                                                {nodes.map(node => (
+                                                    <div key={node.id} className="bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+                                                        <div className="flex justify-between mb-4">
+                                                            <span className="text-xs font-black text-slate-800 uppercase italic tracking-wider">{node.country}</span>
+                                                            <div className="flex gap-4">
+                                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{node.nature}</span>
+                                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{node.frequency}</span>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                        <p className="text-[11px] font-medium text-slate-500 leading-relaxed italic mb-4 line-clamp-2">
+                                                            "{node.activity}"
+                                                        </p>
+                                                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                                            <div className="text-[10px] font-bold text-indigo-600">Complexity: {node.complexity}</div>
+                                                            <button 
+                                                                onClick={() => updateNode(node.id, 'status', node.status === 'Local' ? 'COE' : 'Local')}
+                                                                className={`text-[9px] font-black uppercase tracking-widest ${node.status === 'Local' ? 'text-indigo-600' : 'text-emerald-500'}`}
+                                                            >
+                                                                {node.status === 'Local' ? 'Shift to COE' : '✓ Standardized'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -189,58 +185,85 @@
                             <div className="animate-in slide-in-from-bottom-8 duration-700 space-y-12">
                                 <div className="flex justify-between items-end">
                                     <div>
-                                        <h2 className="text-4xl text-header text-slate-900 mb-2">Bifurcation Architect</h2>
-                                        <p className="text-slate-500 font-medium">Map your globally consolidated RCM DNA by Cycle and Process.</p>
+                                        <h2 className="text-4xl text-header text-slate-900 mb-2 italic">Audit DNA Ingest</h2>
+                                        <p className="text-slate-500 font-medium">Capture the full RCM hierarchy including Control Activities and Frequencies.</p>
                                     </div>
                                     <button 
-                                        onClick={() => setRcmData([...rcmData, { id: Date.now(), cycle: "NEW", process: "NEW", activity: "New Activity", country: "Entity", execH: 40, status: "Local", complexity: 1.0 }])}
+                                        onClick={() => setRcmData([...rcmData, { id: Date.now(), cycle: "CYCLE", process: "PROCESS", subProcess: "", controlName: "NEW-CTRL", activity: "", country: "ENTITY", execH: 40, testH: 20, status: "Local", complexity: 1.0, frequency: "Monthly", nature: "Manual" }])}
                                         className="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-bold uppercase text-[10px] tracking-widest shadow-xl hover:bg-indigo-700 transition-all"
                                     >
-                                        Add Control DNA
+                                        Add Control Node
                                     </button>
                                 </div>
 
                                 <div className="bg-white rounded-[3.5rem] border border-slate-100 card-shadow overflow-hidden">
-                                    <table className="w-full text-left font-medium">
-                                        <thead className="bg-slate-50/50 border-b text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                                            <tr>
-                                                <th className="px-12 py-8">Cycle / Process / Activity</th>
-                                                <th className="px-12 py-8">Entity</th>
-                                                <th className="px-12 py-8 text-center">Complexity</th>
-                                                <th className="px-12 py-8 text-right">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {rcmData.map((c, i) => (
-                                                <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
-                                                    <td className="px-12 py-8">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex gap-2">
-                                                                <input value={c.cycle} onChange={e => updateNode(c.id, 'cycle', e.target.value)} className="text-[10px] font-bold text-indigo-400 uppercase bg-transparent outline-none w-12" />
-                                                                <span className="text-slate-200">/</span>
-                                                                <input value={c.process} onChange={e => updateNode(c.id, 'process', e.target.value)} className="text-[10px] font-bold text-slate-400 uppercase bg-transparent outline-none" />
-                                                            </div>
-                                                            <input value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="text-lg text-header text-slate-900 bg-transparent outline-none focus:text-indigo-600" />
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-12 py-8">
-                                                        <input value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="text-[11px] font-bold text-slate-500 uppercase bg-transparent outline-none" />
-                                                    </td>
-                                                    <td className="px-12 py-8 text-center">
-                                                        <input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="w-12 bg-slate-50 p-2 rounded-xl text-xs font-bold text-center" />
-                                                    </td>
-                                                    <td className="px-12 py-8 text-right">
-                                                        <button 
-                                                            onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'COE' : 'Local')}
-                                                            className={`text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-lg ${c.status === 'COE' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}
-                                                        >
-                                                            {c.status === 'Local' ? 'Shift to COE' : 'Standardized'}
-                                                        </button>
-                                                    </td>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left font-medium min-w-[1200px]">
+                                            <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                <tr>
+                                                    <th className="px-10 py-8">Lineage & Control Name</th>
+                                                    <th className="px-10 py-8">Control Activity Description</th>
+                                                    <th className="px-10 py-8">Attributes</th>
+                                                    <th className="px-10 py-8 text-center">Hours</th>
+                                                    <th className="px-10 py-8 text-right">Action</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {rcmData.map((c, i) => (
+                                                    <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
+                                                        <td className="px-10 py-8 w-64">
+                                                            <div className="flex flex-col gap-2">
+                                                                <div className="flex gap-2">
+                                                                    <input value={c.cycle} onChange={e => updateNode(c.id, 'cycle', e.target.value)} className="text-[9px] font-black text-indigo-400 uppercase bg-transparent w-10" />
+                                                                    <input value={c.process} onChange={e => updateNode(c.id, 'process', e.target.value)} className="text-[9px] font-bold text-slate-300 uppercase bg-transparent" />
+                                                                </div>
+                                                                <input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-lg text-header text-slate-900 bg-transparent outline-none focus:text-indigo-600" />
+                                                                <input value={c.subProcess} placeholder="Add Sub-Process (Optional)" onChange={e => updateNode(c.id, 'subProcess', e.target.value)} className="text-[10px] font-medium text-slate-400 bg-transparent outline-none italic" />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 max-w-sm">
+                                                            <textarea 
+                                                                value={c.activity} 
+                                                                onChange={e => updateNode(c.id, 'activity', e.target.value)}
+                                                                className="w-full bg-slate-50 p-4 rounded-xl text-[11px] font-medium text-slate-600 leading-relaxed italic border-none h-24 focus:ring-1 focus:ring-indigo-100 custom-scroll"
+                                                                placeholder="Describe the control procedure..."
+                                                            />
+                                                        </td>
+                                                        <td className="px-10 py-8">
+                                                            <div className="flex flex-col gap-4">
+                                                                <select value={c.nature} onChange={e => updateNode(c.id, 'nature', e.target.value)} className="text-[10px] font-bold uppercase tracking-widest bg-slate-50 p-2 rounded-lg border-none text-slate-500">
+                                                                    <option>Manual</option>
+                                                                    <option>Automated</option>
+                                                                    <option>ITAC</option>
+                                                                </select>
+                                                                <select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="text-[10px] font-bold uppercase tracking-widest bg-slate-50 p-2 rounded-lg border-none text-slate-500">
+                                                                    <option>Daily</option>
+                                                                    <option>Weekly</option>
+                                                                    <option>Monthly</option>
+                                                                    <option>Quarterly</option>
+                                                                    <option>Annual</option>
+                                                                </select>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-center">
+                                                            <div className="flex flex-col gap-2">
+                                                                <span className="text-[9px] font-bold text-slate-400 uppercase">Exec Hours</span>
+                                                                <input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="w-16 bg-slate-50 p-2 rounded-xl text-xs font-bold text-center outline-none" />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-8 text-right">
+                                                            <button 
+                                                                onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))}
+                                                                className="text-[10px] font-black text-rose-400 uppercase tracking-widest hover:text-rose-600 transition-colors"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -250,30 +273,24 @@
                                 <h2 className="text-4xl text-header text-slate-900 mb-12">Baseline Modeling</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
                                     <div className="space-y-10">
-                                        <div>
-                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-4 italic">Labor Arbitrage ($/h)</label>
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                                    <span className="text-[10px] font-bold text-slate-400 mb-2 block uppercase tracking-tighter">In-Country</span>
-                                                    <input type="number" value={levers.inCountryRate} onChange={e => setLevers({...levers, inCountryRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
-                                                </div>
-                                                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                                                    <span className="text-[10px] font-bold text-slate-400 mb-2 block uppercase tracking-tighter">COE / SSC</span>
-                                                    <input type="number" value={levers.coeRate} onChange={e => setLevers({...levers, coeRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
-                                                </div>
+                                        <div className="bg-indigo-50 p-10 rounded-[3rem] border border-indigo-100">
+                                            <label className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 italic text-center">COE Target Efficiency (%)</label>
+                                            <div className="flex items-center gap-6">
+                                                <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e => setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="flex-1 accent-indigo-600" />
+                                                <span className="text-3xl text-header text-indigo-600 italic">{levers.coeEfficiencyLift}%</span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="space-y-10">
-                                        <div className="bg-indigo-50 p-10 rounded-[3rem] border border-indigo-100">
-                                            <label className="text-[11px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 italic">COE Efficiency Target (%)</label>
-                                            <div className="flex items-center gap-6">
-                                                <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e => setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="flex-1 accent-indigo-600" />
-                                                <span className="text-3xl text-header text-indigo-600">{levers.coeEfficiencyLift}%</span>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Local Rate ($/h)</label>
+                                                <input type="number" value={levers.inCountryRate} onChange={e => setLevers({...levers, inCountryRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
                                             </div>
-                                            <p className="mt-6 text-xs text-indigo-400 font-medium leading-relaxed italic">
-                                                Standardizing fragmented nodes typically unlocks 30–50% efficiency through centralization and process removal.
-                                            </p>
+                                            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-100">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">COE Rate ($/h)</label>
+                                                <input type="number" value={levers.coeRate} onChange={e => setLevers({...levers, coeRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
