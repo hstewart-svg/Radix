@@ -15,7 +15,7 @@
         .nav-glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #f1f5f9; }
         .card-shadow { box-shadow: 0 10px 40px -12px rgba(0,0,0,0.05); transition: all 0.4s ease; }
         .text-header { font-weight: 800; font-style: italic; letter-spacing: -0.04em; }
-        .wave-tag { font-size: 9px; font-weight: 900; padding: 4px 12px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.1em; }
+        .action-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
@@ -34,61 +34,39 @@
             const [csvInput, setCsvInput] = useState("");
             const [levers, setLevers] = useState({
                 localRate: 115, coeRate: 45, internalAuditRate: 125, externalAuditRate: 245,
-                autoTestTarget: 2, coeEfficiencyLift: 35, fteHours: 1800
+                autoTestTarget: 2, coeEfficiencyLift: 35
             });
 
+            // 1. DATA STATE
             const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Manager reviews proposal report and matches totals to register.", country: "Italy", group: "Other", execH: 140, testH: 60, status: "Local", nature: "Manual", frequency: "Weekly", complexity: 1.2, wave: 1, res: "Internal" },
-                { id: 2, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Local clerk verifies batch totals against bank files.", country: "Germany", group: "DACH", execH: 110, testH: 40, status: "Local", nature: "Manual", frequency: "Weekly", complexity: 1.0, wave: 1, res: "External" },
-                { id: 3, cycle: "R2R", process: "GL", sub: "Close", controlName: "GL-05", activity: "Manual JE Approval for amounts >$500k.", country: "Germany", group: "DACH", execH: 95, testH: 45, status: "Local", nature: "Manual", frequency: "Daily", complexity: 1.4, wave: 2, res: "Internal" }
+                { id: 1, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Manager reviews manual proposal report.", country: "Italy", group: "Other", execH: 140, testH: 60, status: "Local", nature: "Manual", complexity: 1.2, wave: 1 },
+                { id: 2, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Local clerk verifies batches.", country: "Germany", group: "DACH", execH: 110, testH: 40, status: "Local", nature: "Manual", complexity: 1.0, wave: 1 }
             ]);
 
+            // 2. ANALYTICS
             const analysis = useMemo(() => {
-                const frags = {};
-                const waves = { 1: 0, 2: 0, 3: 0 };
-                const regional = {};
-                
-                rcmData.forEach(c => {
-                    // Frag Map
-                    if (!frags[c.controlName]) frags[c.controlName] = [];
-                    frags[c.controlName].push(c);
-
-                    // Regional Rollup
-                    if (!regional[c.country]) regional[c.country] = { debt: 0, count: 0 };
-                    regional[c.country].debt += (c.execH * levers.localRate);
-                    regional[c.country].count += 1;
-
-                    // Wave Logic (Projected ROI)
+                const results = rcmData.reduce((acc, c) => {
                     const localCost = c.execH * levers.localRate;
-                    const netLift = levers.coeEfficiencyLift / c.complexity;
-                    const coeCost = (c.execH * (1 - (netLift/100))) * levers.coeRate;
-                    waves[c.wave] += (localCost - coeCost);
+                    if (c.status === "COE") {
+                        const netLift = levers.coeEfficiencyLift / c.complexity;
+                        const coeCost = (c.execH * (1 - (netLift/100))) * levers.coeRate;
+                        acc.opSavings += (localCost - coeCost);
+                    }
+                    if (c.nature === "Automated") {
+                        const auditRate = levers.externalAuditRate; // Simplified for dashboard
+                        acc.auditSavings += ((c.testH - levers.autoTestTarget) * auditRate);
+                    }
+                    return acc;
+                }, { opSavings: 0, auditSavings: 0 });
+
+                const fragments = {};
+                rcmData.forEach(item => {
+                    if (!fragments[item.controlName]) fragments[item.controlName] = [];
+                    fragments[item.controlName].push(item);
                 });
 
-                return { 
-                    fragments: frags, 
-                    waveStats: waves,
-                    regional: Object.entries(regional).sort((a,b)=>b[1].debt - a[1].debt),
-                    totalOpSavings: Object.values(waves).reduce((a,b)=>a+b, 0)
-                };
+                return { ...results, fragments };
             }, [rcmData, levers]);
-
-            const handleCsv = () => {
-                const lines = csvInput.split('\n');
-                const nodes = lines.map(l => {
-                    const [cyc, proc, sub, name, act, ctry, exec, test, comp, freq, nat, res, wave] = l.split(',');
-                    if (!name || !ctry) return null;
-                    const c = ctry.trim();
-                    return {
-                        id: Math.random(), cycle: cyc.trim(), process: proc.trim(), sub: sub.trim(), controlName: name.trim(),
-                        activity: act.trim(), country: c, group: Object.keys(GROUPS).find(g => GROUPS[g].includes(c)) || "Other",
-                        execH: Number(exec), testH: Number(test), complexity: Number(comp), frequency: freq.trim(), nature: nat.trim(),
-                        res: res?.trim() || "Internal", wave: Number(wave) || 1, status: "Local"
-                    };
-                }).filter(n => n !== null);
-                setRcmData([...rcmData, ...nodes]);
-                setCsvInput(""); setView('home');
-            };
 
             const updateNode = (id, field, value) => {
                 setRcmData(rcmData.map(n => {
@@ -99,14 +77,27 @@
                 }));
             };
 
+            const handleCsv = () => {
+                const lines = csvInput.split('\n');
+                const nodes = lines.map(l => {
+                    const [cyc, proc, sub, name, act, ctry, exec, test, comp] = l.split(',');
+                    if (!name || !ctry) return null;
+                    return {
+                        id: Math.random(), cycle: cyc.trim(), process: proc.trim(), sub: sub.trim(), controlName: name.trim(),
+                        activity: act.trim(), country: ctry.trim(), status: "Local", nature: "Manual",
+                        execH: Number(exec), testH: Number(test), complexity: Number(comp), wave: 1
+                    };
+                }).filter(n => n !== null);
+                setRcmData([...rcmData, ...nodes]);
+                setCsvInput(""); setView('home');
+            };
+
             const StructuralLogo = () => (
                 <div className="flex items-center gap-4">
                     <svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="8" width="6" height="24" rx="1.5" fill="#4F46E5"/><path d="M14 8H24C28.4 8 32 11.6 32 16C32 20.4 28.4 24 24 24H14V8Z" fill="#4F46E5" fillOpacity="0.8"/><path d="M22 24L30 32H22L14 24H22Z" fill="#4F46E5"/></svg>
                     <div className="flex flex-col">
                         <span className="text-2xl text-header text-slate-900 leading-none italic uppercase">Radix</span>
-                        <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1 italic">
-                            {view === 'home' ? 'Transformation Map' : view === 'roadmap' ? 'Standardization Roadmap' : view === 'ingest' ? 'Architect' : 'Baseline Modeling'}
-                        </span>
+                        <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1 italic">Transformation Architect</span>
                     </div>
                 </div>
             );
@@ -115,155 +106,103 @@
                 <div className="min-h-screen">
                     <nav className="nav-glass sticky top-0 z-50 px-10 py-5 flex justify-between items-center">
                         <button onClick={() => setView('home')}><StructuralLogo /></button>
-                        <div className="flex gap-8">
+                        <div className="flex gap-10">
                             <button onClick={() => setView('home')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='home'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Map</button>
-                            <button onClick={() => setView('roadmap')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='roadmap'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Roadmap</button>
                             <button onClick={() => setView('ingest')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Architect</button>
                             <button onClick={() => setView('config')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='config'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Baseline</button>
                         </div>
                     </nav>
 
-                    <main className="max-w-7xl mx-auto p-12 space-y-16">
+                    <main className="max-w-7xl mx-auto p-12 space-y-12">
                         {view === 'home' && (
-                            <div className="space-y-16 animate-in fade-in duration-700">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                                    <div className="lg:col-span-2 space-y-10">
-                                        <h2 className="text-3xl text-header text-slate-900 italic">Fragmentation Heatmap</h2>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            {Object.entries(analysis.fragments).map(([name, nodes]) => (
-                                                <div key={name} className={`p-8 rounded-[3rem] border-2 card-shadow bg-white ${nodes.length > 1 ? 'border-rose-100 shadow-rose-100/10' : 'border-slate-50'}`}>
-                                                    <div className="flex justify-between items-start mb-6">
-                                                        <h3 className="text-xl text-header text-slate-900 uppercase italic leading-tight">{name}</h3>
-                                                        <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider ${nodes.length > 1 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                                                            {nodes.length > 1 ? `${nodes.length} Sites` : 'Optimized'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        {nodes.map(n => (
-                                                            <div key={n.id} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <span className="text-[10px] font-black uppercase italic tracking-widest">{n.country}</span>
-                                                                    <span className="text-[9px] font-bold text-slate-400 uppercase">Wave {n.wave}</span>
-                                                                </div>
-                                                                <p className="text-[11px] font-medium text-slate-500 italic line-clamp-1">"{n.activity}"</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                            <div className="space-y-12 animate-in fade-in duration-700">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="bg-indigo-950 p-12 rounded-[3.5rem] text-white card-shadow border-l-8 border-emerald-400">
+                                        <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 italic">Operational Dividend</h3>
+                                        <p className="text-5xl font-extrabold italic text-emerald-400">${Math.round(analysis.opSavings).toLocaleString()}</p>
                                     </div>
-                                    <div className="space-y-10">
-                                        <h2 className="text-3xl text-header text-slate-900 italic text-right">Regional Rollup</h2>
-                                        <div className="space-y-4">
-                                            {analysis.regional.map(([ctry, data]) => (
-                                                <div key={ctry} className="bg-white p-6 rounded-[2rem] border border-slate-100 card-shadow flex justify-between items-center">
-                                                    <span className="text-sm font-extrabold italic uppercase tracking-tighter">{ctry}</span>
-                                                    <div className="text-right">
-                                                        <span className="text-[10px] font-bold text-slate-400 block uppercase">Manual Debt</span>
-                                                        <span className="text-lg font-black italic text-rose-500">${data.debt.toLocaleString()}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'roadmap' && (
-                            <div className="space-y-16 animate-in slide-in-from-bottom-6 duration-700">
-                                <div className="flex justify-between items-end">
-                                    <div className="max-w-xl">
-                                        <h2 className="text-4xl text-header text-slate-900 mb-2 italic">Standardization Roadmap</h2>
-                                        <p className="text-slate-500 font-medium italic">Projected ROI capture per transformation wave. Adjust Waves in the Architect tab.</p>
-                                    </div>
-                                    <div className="bg-indigo-950 px-10 py-6 rounded-[2.5rem] text-white card-shadow border-l-4 border-emerald-400">
-                                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1 italic">Total Run-Rate Potential</p>
-                                        <p className="text-4xl text-header text-emerald-400 italic">${Math.round(analysis.totalOpSavings).toLocaleString()}</p>
+                                    <div className="bg-white p-12 rounded-[3.5rem] border border-slate-100 flex flex-col justify-center">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 italic">Audit Dividend</h3>
+                                        <p className="text-5xl font-extrabold italic text-indigo-600">${Math.round(analysis.auditSavings).toLocaleString()}</p>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                    {[1, 2, 3].map(w => (
-                                        <div key={w} className="bg-white p-10 rounded-[3.5rem] border border-slate-100 card-shadow flex flex-col justify-between group">
-                                            <div>
-                                                <span className={`wave-tag mb-6 inline-block ${w===1 ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                                    Wave 0{w}
-                                                </span>
-                                                <h3 className="text-2xl text-header text-slate-900 mb-4">{w===1 ? 'Foundation' : w===2 ? 'Expansion' : 'Optimization'}</h3>
-                                                <p className="text-xs text-slate-400 font-medium italic leading-relaxed mb-10">Targeting {rcmData.filter(c=>c.wave===w).length} high-friction control nodes for COE migration.</p>
+                                <div className="space-y-8">
+                                    <h2 className="text-3xl text-header text-slate-900 italic uppercase">Process DNA Heatmap</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {Object.entries(analysis.fragments).map(([name, nodes]) => (
+                                            <div key={name} className={`p-10 rounded-[3rem] border-2 card-shadow bg-white ${nodes.length > 1 ? 'border-rose-100' : 'border-slate-50'}`}>
+                                                <div className="flex justify-between items-start mb-6">
+                                                    <h3 className="text-xl text-header text-slate-900 uppercase italic">{name}</h3>
+                                                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase ${nodes.length > 1 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>{nodes.length > 1 ? 'Fragmented' : 'Standardized'}</span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {nodes.map(n => (
+                                                        <div key={n.id} className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
+                                                            <div className="flex justify-between mb-2"><span className="text-[11px] font-black uppercase italic">{n.country}</span><span className="text-[9px] font-bold text-slate-400 uppercase">W{n.wave}</span></div>
+                                                            <p className="text-[11px] font-medium text-slate-500 italic line-clamp-1">"{n.activity}"</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                            <div className="pt-8 border-t border-slate-50">
-                                                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Projected Capture</p>
-                                                <p className="text-3xl text-header text-slate-800 italic">${Math.round(analysis.waveStats[w] || 0).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
-                            <div className="animate-in slide-in-from-bottom-8 duration-700 space-y-12">
-                                <div className="bg-slate-900 p-12 rounded-[4rem] text-white shadow-2xl">
-                                    <h3 className="text-xl text-header text-indigo-400 mb-6 uppercase italic">CSV RCM Osmosis Engine</h3>
-                                    <textarea value={csvInput} onChange={e=>setCsvInput(e.target.value)} placeholder="Cycle, Process, Sub, Name, Activity, Country, ExecH, TestH, Comp, Freq, Nature, Res, Wave" className="w-full h-32 bg-slate-800 rounded-2xl p-6 text-xs font-mono text-indigo-300 focus:outline-none ring-1 ring-slate-700" />
-                                    <button onClick={handleCsv} className="w-full bg-indigo-600 p-5 rounded-xl font-black uppercase text-[10px] tracking-widest mt-6 hover:bg-indigo-500 shadow-xl shadow-indigo-950">Execute Ingest</button>
+                            <div className="space-y-12 animate-in slide-in-from-bottom-8 duration-500">
+                                {/* EDITABLE ADD ROW INTERFACE (Top) */}
+                                <div className="flex justify-between items-end">
+                                    <div className="max-w-xl">
+                                        <h2 className="text-4xl text-header text-slate-900 italic uppercase tracking-tighter">Transformation Architect</h2>
+                                        <p className="text-slate-500 font-medium italic">Adjust the 'Location' and 'Nature' levers to model your ROI.</p>
+                                    </div>
+                                    <button onClick={()=>setRcmData([{id: Date.now(), cycle: "CYCLE", process: "PROCESS", sub: "", controlName: "NEW-CTRL", activity: "", country: "Germany", group: "DACH", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1}, ...rcmData])} className="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-bold uppercase text-[10px] tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700">Add Control DNA</button>
                                 </div>
+
                                 <div className="bg-white rounded-[3.5rem] border border-slate-100 card-shadow overflow-hidden">
-                                    <table className="w-full text-left min-w-[1400px]">
+                                    <table className="w-full text-left font-medium min-w-[1400px]">
                                         <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                                            <tr><th className="px-10 py-8">Hierarchy & Name</th><th className="px-10 py-8">DNA Activity Narrative</th><th className="px-10 py-8">Geo</th><th className="px-10 py-8">Phasing</th><th className="px-10 py-8 text-right">Action</th></tr>
+                                            <tr><th className="px-10 py-10">Control Hierarchy</th><th className="px-10 py-10">Activity DNA</th><th className="px-10 py-10">Geo / Complexity</th><th className="px-10 py-10 text-center">Transform Levers</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
-                                            {rcmData.map((c, i) => (
+                                            {rcmData.map((c) => (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-all text-sm">
-                                                    <td className="px-10 py-8 w-72">
+                                                    <td className="px-10 py-10 w-72">
                                                         <input value={c.controlName} onChange={e=>updateNode(c.id, 'controlName', e.target.value)} className="text-xl text-header italic uppercase outline-none w-full bg-transparent text-indigo-950" />
-                                                        <span className="text-[10px] font-bold text-slate-300 uppercase block mt-1 tracking-widest">{c.cycle} / {c.process}</span>
+                                                        <div className="flex gap-2 mt-2"><input value={c.cycle} onChange={e=>updateNode(c.id, 'cycle', e.target.value)} className="text-[9px] font-black text-indigo-400 uppercase bg-transparent w-10" /><input value={c.process} onChange={e=>updateNode(c.id, 'process', e.target.value)} className="text-[9px] font-bold text-slate-300 uppercase bg-transparent" /></div>
                                                     </td>
-                                                    <td className="px-10 py-8"><textarea value={c.activity} onChange={e=>updateNode(c.id, 'activity', e.target.value)} className="w-full bg-slate-50/50 p-5 rounded-2xl text-[11px] font-medium italic border-none h-32 leading-relaxed custom-scroll" /></td>
-                                                    <td className="px-10 py-8">
-                                                        <select value={c.country} onChange={e=>updateNode(c.id, 'country', e.target.value)} className="bg-slate-50 p-3 rounded-xl text-[10px] font-black uppercase outline-none">
-                                                            {EUROPE_INVENTORY.map(co => <option key={co} value={co}>{co}</option>)}
-                                                        </select>
-                                                        <span className="text-[9px] font-bold text-indigo-400 block mt-3 uppercase italic tracking-[0.2em]">{c.group} Group</span>
+                                                    <td className="px-10 py-10"><textarea value={c.activity} onChange={e=>updateNode(c.id, 'activity', e.target.value)} className="w-full bg-slate-50/50 p-5 rounded-2xl text-[11px] font-medium italic border-none h-24 custom-scroll" placeholder="Copy/Paste Narrative..." /></td>
+                                                    <td className="px-10 py-10">
+                                                        <select value={c.country} onChange={e=>updateNode(c.id, 'country', e.target.value)} className="bg-slate-50 p-3 rounded-xl text-[10px] font-black uppercase outline-none mb-4 block w-full">{EUROPE_INVENTORY.map(co => <option key={co} value={co}>{co}</option>)}</select>
+                                                        <div className="flex justify-between items-center"><span className="text-[9px] font-bold text-slate-400 uppercase">Complexity:</span><input type="number" step="0.1" value={c.complexity} onChange={e=>updateNode(c.id, 'complexity', Number(e.target.value))} className="w-10 text-xs font-black text-center bg-transparent" /></div>
                                                     </td>
-                                                    <td className="px-10 py-8">
-                                                        <select value={c.wave} onChange={e=>updateNode(c.id, 'wave', Number(e.target.value))} className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl outline-none italic">
-                                                            {[1,2,3].map(w=><option key={w} value={w}>Wave {w}</option>)}
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-10 py-8 text-right space-y-3">
-                                                        <button onClick={()=>updateNode(c.id, 'status', c.status==='Local'?'COE':'Local')} className={`text-[10px] font-black uppercase block ml-auto ${c.status==='COE'?'text-emerald-500':'text-indigo-600 underline underline-offset-8'}`}>{c.status==='Local'?'Shift to COE':'✓ COE Hub'}</button>
-                                                        <button onClick={()=>updateNode(c.id, 'nature', c.nature==='Manual'?'Automated':'Manual')} className={`text-[10px] font-black uppercase block ml-auto ${c.nature==='Automated'?'text-emerald-500':'text-indigo-600 underline underline-offset-8'}`}>{c.nature==='Manual'?'Automate Node':'✓ Automated'}</button>
+                                                    <td className="px-10 py-10 text-right">
+                                                        <div className="flex flex-col gap-4 items-end">
+                                                            <div className="flex gap-4">
+                                                                <button onClick={()=>updateNode(c.id, 'status', c.status==='Local'?'COE':'Local')} className={`action-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${c.status==='COE' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white shadow-sm'}`}>
+                                                                    {c.status==='Local' ? 'Shift to COE' : '✓ In COE'}
+                                                                </button>
+                                                                <button onClick={()=>updateNode(c.id, 'nature', c.nature==='Manual'?'Automated':'Manual')} className={`action-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest ${c.nature==='Automated' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-indigo-600 text-white shadow-sm'}`}>
+                                                                    {c.nature==='Manual' ? 'Automate' : '✓ Automated'}
+                                                                </button>
+                                                            </div>
+                                                            <button onClick={()=>setRcmData(rcmData.filter(n=>n.id!==c.id))} className="text-[9px] font-black text-rose-300 uppercase italic hover:text-rose-500">Remove Node</button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
-                        )}
 
-                        {view === 'config' && (
-                            <div className="bg-white p-16 rounded-[4rem] border border-slate-100 card-shadow animate-in fade-in duration-500 space-y-12">
-                                <h2 className="text-4xl text-header text-slate-900 italic uppercase">Baseline Modeling</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
-                                    <div className="bg-indigo-50/50 p-12 rounded-[3.5rem] border border-indigo-100 space-y-8">
-                                        <label className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.2em] block mb-4 italic text-center">Standard Optimization Factor</label>
-                                        <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e=>setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="w-full accent-indigo-600" />
-                                        <div className="flex justify-between items-center"><span className="text-4xl text-header text-indigo-600 italic">{levers.coeEfficiencyLift}%</span><span className="text-[10px] font-black text-indigo-400 italic uppercase">Efficiency Lift Target</span></div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        {Object.entries({ 'In-Country': 'localRate', 'COE / SSC': 'coeRate', 'Internal IA': 'internalAuditRate', 'Ext. Partner': 'externalAuditRate' }).map(([label, key]) => (
-                                            <div key={key} className="bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100">
-                                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">{label}</label>
-                                                <input type="number" value={levers[key]} onChange={e=>setLevers({...levers, [key]: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-950 bg-transparent outline-none italic" />
-                                            </div>
-                                        ))}
-                                    </div>
+                                {/* BULK INGEST (Bottom) */}
+                                <div className="bg-slate-900 p-12 rounded-[4rem] text-white shadow-2xl">
+                                    <h3 className="text-xl text-header text-indigo-400 mb-6 uppercase italic">Bulk RCM Osmosis</h3>
+                                    <textarea value={csvInput} onChange={e=>setCsvInput(e.target.value)} placeholder="Cycle, Process, Sub, Name, Activity, Country, ExecH, TestH, Comp" className="w-full h-32 bg-slate-800 rounded-2xl p-6 text-xs font-mono text-indigo-300 focus:outline-none ring-1 ring-slate-700" />
+                                    <button onClick={handleCsv} className="w-full bg-indigo-600 p-4 rounded-xl font-black uppercase text-[10px] tracking-widest mt-6 hover:bg-indigo-500">Execute Bulk Ingest</button>
                                 </div>
                             </div>
                         )}
