@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix | Carve-Out Architecture</title>
+    <title>Radix | Transformation Modeler</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,136 +13,130 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState } = React;
 
-        const scenarios = [
-            {
-                id: 0,
-                title: "Cost Allocation Methodology",
-                category: "Form 10 / S-1 Readiness",
-                riskLevel: "High Judgment",
-                description: "Allocating shared corporate costs (CFO, IT, Legal) to Coffee Co using allocation keys.",
-                representation: "Shared costs were allocated using a 'reasonable and consistent' methodology based primarily on revenue and headcount across all presented years.",
-                auditChallenge: "Deloitte Inquiry: Why was 'Revenue' used for IT Help Desk allocation when 'Ticket Usage' data was available? Switching keys results in a $1.2M EBITDA reduction for Coffee Co.",
-                controlQuestion: "Who owns the allocation model? How are changes to allocation keys documented, reviewed, and approved?",
-                fix: "Implement a 'Methodology Change Log' and a formal Executive Approval Workflow for all allocation key deviations."
-            },
-            {
-                id: 1,
-                title: "TSA: Related Party to 3rd Party",
-                category: "Transition Service Agreements",
-                riskLevel: "Control Design Gap",
-                description: "Post-separation, KDP provides IT and Payroll to Coffee Co under written agreements.",
-                representation: "All TSA transactions are recorded at cost plus a standard markup, mirroring KDP's internal cost structures.",
-                auditChallenge: "Arm's Length Risk: The TSA pricing for IT services is 20% below market rates. This creates a potential tax profit-shifting risk in international jurisdictions.",
-                controlQuestion: "Is there a contemporaneous documentation framework to prove 'Arm's Length' pricing to tax authorities?",
-                fix: "Build a 'TSA Governance Portal' to track written agreements, pricing benchmarks, and monthly invoice reconciliations."
-            },
-            {
-                id: 2,
-                title: "Goodwill & PPA ($ASC \ 805$)",
-                category: "Purchase Price Allocation",
-                riskLevel: "Valuation Sensitivity",
-                description: "Allocating the $18B JDE Peet's purchase price to brands, tech, and goodwill.",
-                representation: "Brand names are valued using the Relief from Royalty method. Useful lives are consistent with industry standards (15-20 years).",
-                auditChallenge: "Impairment Trigger: Coffee Co margins have declined by 5%. The annual goodwill impairment model uses a 12% growth rate. Sensitizing growth to 8% triggers a $500M impairment.",
-                controlQuestion: "How does management challenge the valuation specialist's DCF assumptions (WACC, terminal growth)?",
-                fix: "Establish a 'Valuation Steering Committee' to perform quarterly sensitivity analysis on key PPA assumptions."
-            }
-        ];
+        const App = () => {
+            const [digging, setDigging] = useState(false);
+            const [analysis, setAnalysis] = useState(null);
 
-        function App() {
-            const [activeIdx, setActiveIdx] = useState(0);
-            const [showChallenge, setShowChallenge] = useState(false);
-            const current = scenarios[activeIdx];
+            // Based on Source 305: Minimum Annual Sample Size Table
+            const sampleSizeMap = {
+                dailyHigh: 40,
+                weeklyHigh: 15,
+                automated: 1
+            };
+
+            const unearthSavings = () => {
+                setDigging(true);
+                setTimeout(() => {
+                    setAnalysis({
+                        controlName: "High-Volume P2P Matching",
+                        manualHours: sampleSizeMap.dailyHigh * 1.5, // 1.5 hrs per manual sample
+                        automatedHours: sampleSizeMap.automated * 0.5, // 0.5 hrs per system query
+                        totalControls: 12,
+                        risk: "High"
+                    });
+                    setDigging(false);
+                }, 1500);
+            };
 
             return (
                 <div className="min-h-screen">
-                    <nav className="bg-slate-900 text-white p-6 shadow-2xl border-b border-amber-500/30">
-                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div>
-                                <h1 className="text-3xl font-black tracking-tighter">RADIX <span className="text-amber-500">| CARVE-OUT</span></h1>
-                                <p className="text-[10px] tracking-[0.4em] text-slate-400 font-bold uppercase">Constructing Hypothetical Reality</p>
+                    <nav className="bg-indigo-950 text-white p-6 shadow-2xl border-b-4 border-emerald-500">
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-500 flex items-center justify-center rounded-lg shadow-lg">
+                                    <span className="text-indigo-950 font-black text-2xl tracking-tighter">Rx</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-2xl font-black tracking-tighter uppercase italic leading-none">Radix <span className="text-emerald-400">Modeler</span></h1>
+                                    <p className="text-[9px] tracking-[0.4em] text-indigo-300 font-bold uppercase mt-1">Efficiency Architect</p>
+                                </div>
                             </div>
-                            <div className="flex flex-wrap justify-center gap-2">
-                                {scenarios.map((s, i) => (
-                                    <button 
-                                        key={i}
-                                        onClick={() => { setActiveIdx(i); setShowChallenge(false); }}
-                                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase transition-all ${activeIdx === i ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-800 text-slate-500'}`}
-                                    >
-                                        Case {i + 1}: {s.title.split(' ')[0]}
-                                    </button>
-                                ))}
-                            </div>
+                            <button 
+                                onClick={unearthSavings}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 border border-emerald-400/30"
+                            >
+                                {digging ? "Calculating Compliance Dividend..." : "Unearth Testing Efficiency"}
+                            </button>
                         </div>
                     </nav>
 
-                    <main className="p-6 md:p-12 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Summary Column */}
-                        <div className="lg:col-span-1 space-y-6">
-                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-                                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{current.category}</span>
-                                <h2 className="text-2xl font-bold text-slate-800 mt-2">{current.title}</h2>
-                                <p className="text-slate-500 text-sm mt-4 leading-relaxed">{current.description}</p>
-                                <div className="mt-8 pt-8 border-t border-slate-100">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Audit Sensitivity</span>
-                                        <span className="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded-full font-black">{current.riskLevel}</span>
-                                    </div>
-                                </div>
+                    <main className="p-8 max-w-6xl mx-auto">
+                        {!analysis && !digging ? (
+                            <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+                                <h2 className="text-4xl text-slate-200 font-black uppercase tracking-widest">Efficiency Diagnostic</h2>
+                                <p className="text-slate-400 text-sm mt-4 italic">"Transforming sample sizes into savings."</p>
                             </div>
-                        </div>
-
-                        {/* Interactive Logic Column */}
-                        <div className="lg:col-span-2 space-y-6">
-                            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 h-full">
-                                <div className="flex justify-between items-center mb-8">
-                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Judgment Lab</h3>
-                                    <button 
-                                        onClick={() => setShowChallenge(!showChallenge)}
-                                        className={`px-6 py-2 rounded-lg text-xs font-black uppercase transition-all ${showChallenge ? 'bg-amber-600 text-white shadow-xl' : 'bg-slate-900 text-white'}`}
-                                    >
-                                        {showChallenge ? 'Review Controls' : 'Scrutinize Assumptions'}
-                                    </button>
-                                </div>
-
-                                <div className="space-y-6">
-                                    <div className="p-6 bg-slate-50 rounded-xl border border-slate-100">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Management Rationale</p>
-                                        <p className="text-slate-700 italic text-sm leading-relaxed">"{current.representation}"</p>
-                                    </div>
-
-                                    {showChallenge && (
-                                        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                                            <div className="p-6 bg-amber-50 border-l-4 border-amber-500 rounded-r-xl">
-                                                <h4 className="text-xs font-black text-amber-800 uppercase mb-2">Deloitte/Auditor Challenge</h4>
-                                                <p className="text-sm text-amber-900 leading-relaxed font-medium">{current.auditChallenge}</p>
+                        ) : digging ? (
+                            <div className="flex flex-col items-center justify-center py-32">
+                                <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                                <p className="mt-6 text-xs font-black text-indigo-900 uppercase tracking-widest animate-pulse italic">Applying FY25 Testing Standards...</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                
+                                {/* Efficiency Stats */}
+                                <div className="lg:col-span-5 space-y-6">
+                                    <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-200 text-center">
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 text-center">Annual Testing Hours (Manual vs. Auto)</h3>
+                                        <div className="flex justify-around items-end h-48 gap-4 px-4">
+                                            <div className="flex flex-col items-center w-full">
+                                                <div style={{height: '100%'}} className="w-full bg-red-100 rounded-t-xl border-x border-t border-red-200 flex items-end justify-center pb-2">
+                                                    <span className="text-red-700 font-black text-lg">{analysis.manualHours}h</span>
+                                                </div>
+                                                <span className="text-[9px] font-black text-slate-400 uppercase mt-4">Manual (n={sampleSizeMap.dailyHigh})</span>
                                             </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="p-4 bg-slate-900 text-white rounded-xl">
-                                                    <h5 className="text-[10px] font-black text-amber-500 uppercase mb-2">IA Control Question</h5>
-                                                    <p className="text-xs text-slate-300 leading-relaxed">{current.controlQuestion}</p>
+                                            <div className="flex flex-col items-center w-full">
+                                                <div style={{height: '8%'}} className="w-full bg-emerald-500 rounded-t-xl shadow-lg flex items-end justify-center pb-2">
+                                                    <span className="text-white font-black text-[10px]">{analysis.automatedHours}h</span>
                                                 </div>
-                                                <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
-                                                    <h5 className="text-[10px] font-black text-indigo-600 uppercase mb-2">The Architect's Fix</h5>
-                                                    <p className="text-xs text-indigo-900 leading-relaxed">{current.fix}</p>
-                                                </div>
+                                                <span className="text-[9px] font-black text-slate-400 uppercase mt-4">Automated (n=1)</span>
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
+
+                                    <div className="bg-indigo-900 text-white p-8 rounded-[2.5rem] shadow-xl">
+                                        <h4 className="text-[10px] font-black text-emerald-400 uppercase mb-4 tracking-widest">Executive Insight</h4>
+                                        <p className="text-sm leading-relaxed text-indigo-100 italic font-medium">
+                                            "Moving {analysis.totalControls} High-Risk controls to automation retires ~700 audit hours annually, creating the bandwidth for deeper transaction-risk analysis."
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Testing Strategy */}
+                                <div className="lg:col-span-7 bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-200">
+                                    <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">Efficiency Roadmap</span>
+                                    <h2 className="text-4xl font-bold mt-2 text-slate-800 tracking-tighter">{analysis.controlName}</h2>
+                                    
+                                    <div className="mt-12 space-y-6">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b pb-4 mb-4">SOX Compliance Dividend</h4>
+                                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <span className="text-xs font-bold text-slate-600 uppercase">Hours Saved per Control</span>
+                                                <span className="text-emerald-600 font-black">-{analysis.manualHours - analysis.automatedHours}h</span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                                <div style={{width: '95%'}} className="bg-emerald-500 h-full"></div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <p className="text-xs text-slate-500 leading-relaxed italic">
+                                                *Calculated based on FY25 SOX Testing Manual: High-Risk Daily Control (n=40) vs. Automated ITAC (n=1). Manual testing includes Inspection and Re-performance.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </main>
                 </div>
             );
-        }
+        };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
