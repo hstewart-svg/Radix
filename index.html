@@ -11,11 +11,10 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,800&display=swap');
         * { font-family: 'Plus Jakarta Sans', sans-serif !important; }
-        body { letter-spacing: 0.025em; background: #fcfdfe; color: #1e293b; }
-        .nav-glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(16px); border-bottom: 1px solid #f1f5f9; }
-        .card-shadow { box-shadow: 0 15px 35px -12px rgba(0,0,0,0.06); transition: all 0.4s ease; }
+        body { letter-spacing: 0.02em; background: #fcfdfe; color: #1e293b; }
+        .nav-glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(16px); border-bottom: 1px solid #f1f5f9; }
+        .card-shadow { box-shadow: 0 10px 40px -12px rgba(0,0,0,0.05); transition: all 0.4s ease; }
         .text-header { font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
-        .pill { font-size: 9px; font-weight: 900; padding: 4px 10px; border-radius: 99px; text-transform: uppercase; letter-spacing: 0.1em; }
     </style>
 </head>
 <body>
@@ -24,155 +23,198 @@
     <script type="text/babel">
         const { useState, useMemo } = React;
 
-        // PRE-DEFINED GEOGRAPHY
-        const EUROPE_INVENTORY = [
-            "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", 
-            "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Latvia", "Liechtenstein", 
-            "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway", "Poland", "Portugal", 
-            "Romania", "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Ukraine", "United Kingdom"
-        ];
-
-        const GROUPS = {
-            "DACH": ["Germany", "Austria", "Switzerland"],
-            "Nordic": ["Denmark", "Finland", "Norway", "Sweden", "Iceland"],
-            "Benelux": ["Belgium", "Netherlands", "Luxembourg"],
-            "UK/IE": ["United Kingdom", "Ireland"]
-        };
+        const EUROPE_INVENTORY = ["Austria", "Belgium", "Denmark", "Finland", "France", "Germany", "Ireland", "Italy", "Luxembourg", "Netherlands", "Norway", "Spain", "Sweden", "Switzerland", "United Kingdom"];
+        const GROUPS = { "DACH": ["Germany", "Austria", "Switzerland"], "Nordics": ["Denmark", "Finland", "Norway", "Sweden"], "Benelux": ["Belgium", "Netherlands", "Luxembourg"] };
 
         const App = () => {
             const [view, setView] = useState('home');
-            const [levers, setLevers] = useState({ inCountryRate: 115, coeRate: 45, coeEfficiencyLift: 35 });
+            const [csvInput, setCsvInput] = useState("");
+            const [levers, setLevers] = useState({ inCountryRate: 115, coeRate: 45, auditRate: 185, autoTestTarget: 2, coeEfficiencyLift: 35 });
             
             const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "P2P", controlName: "PMT-01", country: "Germany", group: "DACH", execH: 120, status: "Local", complexity: 1.0 },
-                { id: 2, cycle: "P2P", controlName: "PMT-01", country: "Austria", group: "DACH", execH: 110, status: "Local", complexity: 1.1 }
+                { id: 1, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Manual Payment Run Review", country: "Italy", group: "Other", execH: 120, testH: 40, status: "Local", nature: "Manual", complexity: 1.2 },
+                { id: 2, cycle: "P2P", process: "AP", sub: "Payments", controlName: "PMT-01", activity: "Manual Payment Run Review", country: "Germany", group: "DACH", execH: 110, testH: 40, status: "Local", nature: "Manual", complexity: 1.0 }
             ]);
 
-            const updateNode = (id, field, value) => {
-                let updatedValue = value;
-                let updatedGroup = null;
+            // 1. FRAGMENTATION ENGINE
+            const fragments = useMemo(() => {
+                const map = {};
+                rcmData.forEach(item => {
+                    if (!map[item.controlName]) map[item.controlName] = [];
+                    map[item.controlName].push(item);
+                });
+                return map;
+            }, [rcmData]);
 
-                // Handle Country selection and auto-mapping to Groups
-                if (field === 'country') {
-                    Object.entries(GROUPS).forEach(([groupName, countries]) => {
-                        if (countries.includes(value)) updatedGroup = groupName;
-                    });
-                }
+            // 2. ROI ENGINE
+            const analysis = useMemo(() => {
+                return rcmData.reduce((acc, c) => {
+                    const localExecCost = c.execH * levers.inCountryRate;
+                    if (c.status === "COE") {
+                        const netLift = levers.coeEfficiencyLift / c.complexity;
+                        const coeExecCost = (c.execH * (1 - (netLift/100))) * levers.coeRate;
+                        acc.opSavings += (localExecCost - coeExecCost);
+                    }
+                    if (c.nature === "Automated") {
+                        acc.auditSavings += ((c.testH - levers.autoTestTarget) * levers.auditRate);
+                    }
+                    return acc;
+                }, { opSavings: 0, auditSavings: 0 });
+            }, [rcmData, levers]);
 
-                setRcmData(rcmData.map(n => n.id === id ? { 
-                    ...n, 
-                    [field]: updatedValue,
-                    ...(updatedGroup ? { group: updatedGroup } : field === 'country' ? { group: 'Other' } : {}) 
-                } : n));
+            // 3. DATA MUTATIONS & INGEST
+            const handleCsvIngest = () => {
+                const lines = csvInput.split('\n');
+                const newNodes = lines.map(line => {
+                    const [cycle, proc, sub, name, act, country, exec, test, comp] = line.split(',');
+                    if (!name || !country) return null;
+                    const cleanCountry = country.trim();
+                    return {
+                        id: Math.random(),
+                        cycle: cycle.trim(), process: proc.trim(), sub: sub.trim(),
+                        controlName: name.trim(), activity: act.trim(),
+                        country: cleanCountry,
+                        group: Object.keys(GROUPS).find(g => GROUPS[g].includes(cleanCountry)) || "Other",
+                        execH: Number(exec) || 40, testH: Number(test) || 20,
+                        complexity: Number(comp) || 1.0, status: "Local", nature: "Manual"
+                    };
+                }).filter(n => n !== null);
+                setRcmData([...rcmData, ...newNodes]);
+                setCsvInput("");
+                setView('home');
             };
 
-            const stats = useMemo(() => {
-                const totalDebt = rcmData.reduce((acc, c) => acc + (c.execH * levers.inCountryRate), 0);
-                return { totalDebt };
-            }, [rcmData, levers]);
+            const updateNode = (id, field, value) => {
+                setRcmData(rcmData.map(n => (n.id === id ? { ...n, [field]: value } : n)));
+            };
 
             const StructuralLogo = () => (
                 <div className="flex items-center gap-4">
-                    <svg width="36" height="36" viewBox="0 0 40 40" fill="none"><rect x="8" y="8" width="6" height="24" rx="1.5" fill="#4F46E5"/><path d="M14 8H24C28.4 8 32 11.6 32 16C32 20.4 28.4 24 24 24H14V8Z" fill="#4F46E5" fillOpacity="0.8"/><path d="M22 24L30 32H22L14 24H22Z" fill="#4F46E5"/></svg>
+                    <svg width="32" height="32" viewBox="0 0 40 40" fill="none"><rect x="8" y="8" width="6" height="24" rx="1.5" fill="#4F46E5"/><path d="M14 8H24C28.4 8 32 11.6 32 16C32 20.4 28.4 24 24 24H14V8Z" fill="#4F46E5" fillOpacity="0.8"/><path d="M22 24L30 32H22L14 24H22Z" fill="#4F46E5"/></svg>
                     <div className="flex flex-col">
-                        <span className="text-2xl text-header text-slate-900 leading-none">Radix</span>
-                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mt-1 italic">Transformation Architect</span>
+                        <span className="text-2xl text-header text-slate-900 leading-none italic">Radix</span>
+                        <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-1">Transformation Architect</span>
                     </div>
                 </div>
             );
 
             return (
                 <div className="min-h-screen">
-                    <nav className="nav-glass sticky top-0 z-50 px-12 py-6 flex justify-between items-center">
+                    <nav className="nav-glass sticky top-0 z-50 px-10 py-5 flex justify-between items-center">
                         <button onClick={() => setView('home')}><StructuralLogo /></button>
-                        <div className="flex gap-10">
-                            <button onClick={() => setView('home')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='home'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400'}`}>Map</button>
-                            <button onClick={() => setView('ingest')} className={`text-[11px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-[12px] decoration-2':'text-slate-400'}`}>Architect</button>
+                        <div className="flex gap-8">
+                            <button onClick={() => setView('home')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='home'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Map</button>
+                            <button onClick={() => setView('ingest')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Ingest Lab</button>
+                            <button onClick={() => setView('config')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='config'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Baseline</button>
                         </div>
                     </nav>
 
                     <main className="max-w-7xl mx-auto p-12 space-y-16">
                         {view === 'home' && (
-                            <div className="space-y-12 animate-in fade-in duration-700">
-                                <div className="flex justify-between items-end">
-                                    <h2 className="text-4xl text-header text-slate-900 italic">Geographic Bifurcation</h2>
-                                    <div className="bg-indigo-950 px-8 py-4 rounded-2xl text-white shadow-xl">
-                                        <p className="text-[9px] font-bold text-indigo-400 uppercase italic">Local Manual Debt</p>
-                                        <p className="text-3xl text-header text-emerald-400 italic">${stats.totalDebt.toLocaleString()}</p>
+                            <div className="space-y-16 animate-in fade-in duration-700">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    <div className="bg-indigo-950 p-12 rounded-[3rem] text-white shadow-2xl border-l-8 border-indigo-500">
+                                        <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2 italic">Operational Dividend (SSC/COE)</h3>
+                                        <p className="text-5xl font-extrabold italic text-emerald-400">${Math.round(analysis.opSavings).toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-white p-12 rounded-[3rem] border border-slate-100 flex flex-col justify-center">
+                                        <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 italic">Audit Cost Avoidance ($n=1$)</h3>
+                                        <p className="text-5xl font-extrabold italic text-indigo-600">${Math.round(analysis.auditSavings).toLocaleString()}</p>
                                     </div>
                                 </div>
 
-                                {/* GROUP VIEW */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    {Object.keys(GROUPS).map(g => (
-                                        <div key={g} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 card-shadow">
-                                            <span className="pill bg-indigo-50 text-indigo-600 mb-4 inline-block">{g} Group</span>
-                                            <h3 className="text-xl text-header text-slate-900 mb-4">{GROUPS[g].join(" + ")}</h3>
-                                            <p className="text-xs text-slate-400 font-medium italic">
-                                                {rcmData.filter(c => c.group === g).length} Control Nodes identified in cluster.
-                                            </p>
-                                        </div>
-                                    ))}
+                                {/* FRAGMENTATION HEATMAP */}
+                                <div className="space-y-8">
+                                    <h2 className="text-3xl text-header text-slate-900 italic">Process Fragmentation Map</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {Object.entries(fragments).map(([name, nodes]) => (
+                                            <div key={name} className={`p-10 rounded-[3rem] border-2 card-shadow bg-white ${nodes.length > 1 ? 'border-rose-100 shadow-rose-100/10' : 'border-slate-50'}`}>
+                                                <div className="flex justify-between items-start mb-10">
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-[0.2em] mb-1">Control DNA</p>
+                                                        <h3 className="text-2xl text-header text-slate-900 uppercase">{name}</h3>
+                                                    </div>
+                                                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider ${nodes.length > 1 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                                                        {nodes.length > 1 ? `Fragmented: ${nodes.length} Sites` : 'Standardized'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {nodes.map(n => <span key={n.id} className="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-3 py-1 rounded-lg border">{n.country} ({n.group})</span>)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
-                            <div className="animate-in slide-in-from-bottom-8 duration-700 space-y-12">
-                                <div className="flex justify-between items-end">
-                                    <h2 className="text-4xl text-header text-slate-900 italic uppercase tracking-tighter">Bifurcation Architect</h2>
-                                    <button 
-                                        onClick={() => setRcmData([...rcmData, { id: Date.now(), cycle: "CYCLE", controlName: "NEW-CTRL", country: "Germany", group: "DACH", execH: 40, status: "Local", complexity: 1.0 }])}
-                                        className="bg-indigo-600 text-white px-10 py-5 rounded-2xl font-bold uppercase text-[10px] tracking-widest shadow-xl"
-                                    >
-                                        Add Control DNA
-                                    </button>
+                            <div className="animate-in slide-in-from-bottom-8 duration-500 space-y-12">
+                                <div className="bg-slate-900 p-12 rounded-[4rem] text-white shadow-2xl">
+                                    <h3 className="text-2xl text-header text-indigo-400 mb-2 uppercase italic tracking-tighter">CSV RCM Osmosis</h3>
+                                    <p className="text-[10px] text-slate-500 uppercase font-black mb-8 tracking-widest italic leading-relaxed">
+                                        Paste Format: Cycle, Process, Sub, Control Name, Activity, Country, ExecH, TestH, Complexity
+                                    </p>
+                                    <textarea 
+                                        value={csvInput} 
+                                        onChange={(e)=>setCsvInput(e.target.value)}
+                                        placeholder="P2P, AP, Payments, PMT-01, Manual Review, Italy, 120, 40, 1.2&#10;P2P, AP, Payments, PMT-01, Manual Review, Germany, 110, 40, 1.0" 
+                                        className="w-full h-48 bg-slate-800 rounded-[2.5rem] p-8 text-xs font-mono text-indigo-300 focus:outline-none ring-1 ring-slate-700"
+                                    />
+                                    <button onClick={handleCsvIngest} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase text-[10px] tracking-widest mt-8 hover:bg-indigo-500 shadow-xl shadow-indigo-900">Execute Ingest Osmosis</button>
                                 </div>
 
                                 <div className="bg-white rounded-[3.5rem] border border-slate-100 card-shadow overflow-hidden">
-                                    <table className="w-full text-left font-medium">
-                                        <thead className="bg-slate-50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
-                                            <tr>
-                                                <th className="px-12 py-10">Control / Cycle</th>
-                                                <th className="px-12 py-10">Country Selection</th>
-                                                <th className="px-12 py-10">Region DNA</th>
-                                                <th className="px-12 py-10 text-right">Strategic Action</th>
-                                            </tr>
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                                            <tr><th className="px-10 py-8">Hierarchy & Name</th><th className="px-10 py-8">Geo</th><th className="px-10 py-8">Status</th><th className="px-10 py-8 text-right">Action</th></tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {rcmData.map((c, i) => (
-                                                <tr key={c.id} className="hover:bg-slate-50 transition-all">
-                                                    <td className="px-12 py-10">
-                                                        <input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-xl text-header text-slate-900 bg-transparent outline-none focus:text-indigo-600 italic uppercase" />
-                                                        <span className="text-[10px] font-bold text-slate-300 uppercase block mt-1">{c.cycle}</span>
+                                                <tr key={c.id} className="hover:bg-slate-50/30 transition-all">
+                                                    <td className="px-10 py-8">
+                                                        <input value={c.controlName} onChange={e=>updateNode(c.id, 'controlName', e.target.value)} className="text-xl text-header text-slate-900 bg-transparent outline-none focus:text-indigo-600 italic uppercase" />
+                                                        <span className="text-[10px] font-bold text-slate-300 uppercase block mt-1">{c.cycle} / {c.process} / {c.sub}</span>
                                                     </td>
-                                                    <td className="px-12 py-10">
-                                                        {/* POINT & CLICK INVENTORY DROPDOWN */}
-                                                        <select 
-                                                            value={c.country} 
-                                                            onChange={e => updateNode(c.id, 'country', e.target.value)}
-                                                            className="bg-slate-50 p-4 rounded-xl text-xs font-black text-slate-700 outline-none border-none ring-1 ring-slate-100 focus:ring-2 focus:ring-indigo-100"
-                                                        >
+                                                    <td className="px-10 py-8">
+                                                        <select value={c.country} onChange={e=>updateNode(c.id, 'country', e.target.value)} className="bg-slate-50 p-2 rounded-xl text-[11px] font-bold uppercase outline-none">
                                                             {EUROPE_INVENTORY.map(country => <option key={country} value={country}>{country}</option>)}
                                                         </select>
                                                     </td>
-                                                    <td className="px-12 py-10">
-                                                        <span className={`pill ${c.group === 'DACH' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
-                                                            {c.group}
-                                                        </span>
+                                                    <td className="px-10 py-8">
+                                                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase ${c.status === 'COE' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>{c.status}</span>
                                                     </td>
-                                                    <td className="px-12 py-10 text-right">
-                                                        <button 
-                                                            onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'COE' : 'Local')}
-                                                            className={`text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all ${c.status === 'Local' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-emerald-500 text-white shadow-lg'}`}
-                                                        >
-                                                            {c.status === 'Local' ? 'Shift to COE' : 'Standardized'}
-                                                        </button>
+                                                    <td className="px-10 py-8 text-right space-y-2">
+                                                        <button onClick={()=>updateNode(c.id, 'status', c.status==='Local'?'COE':'Local')} className="text-[9px] font-black uppercase block ml-auto text-indigo-600 underline underline-offset-4">Standardize</button>
+                                                        <button onClick={()=>updateNode(c.id, 'nature', c.nature==='Manual'?'Automated':'Manual')} className="text-[9px] font-black uppercase block ml-auto text-emerald-600 underline underline-offset-4">Automate</button>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'config' && (
+                            <div className="bg-white p-12 rounded-[4rem] border border-slate-100 card-shadow">
+                                <h2 className="text-3xl font-extrabold italic mb-12 text-slate-900 italic tracking-tighter">Baseline Modeling</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="bg-indigo-50 p-10 rounded-[3rem] border border-indigo-100">
+                                        <label className="text-[12px] font-black text-indigo-400 uppercase tracking-widest block mb-4 italic">COE Efficiency Lift (%)</label>
+                                        <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e=>setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="w-full accent-indigo-600" />
+                                        <div className="flex justify-between mt-4 font-black text-indigo-600 text-2xl italic"><span>0%</span><span>{levers.coeEfficiencyLift}%</span><span>100%</span></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 italic">Local Rate</label>
+                                            <input type="number" value={levers.inCountryRate} onChange={e=>setLevers({...levers, inCountryRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
+                                        </div>
+                                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2 italic">Audit Rate</label>
+                                            <input type="number" value={levers.auditRate} onChange={e=>setLevers({...levers, auditRate: Number(e.target.value)})} className="w-full text-2xl text-header text-slate-900 bg-transparent outline-none" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
