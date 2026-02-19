@@ -10,10 +10,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em; background: #fcfdfe; }
-        .nav-glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #f1f5f9; }
-        .card-shadow { box-shadow: 0 10px 30px -10px rgba(0,0,0,0.04); }
-        .input-focus:focus { outline: none; border-color: #4F46E5; background: white; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.015em; background: #fcfdfe; }
+        .nav-glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid #f1f5f9; }
+        .card-shadow { box-shadow: 0 10px 40px -12px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
@@ -25,31 +24,39 @@
         const App = () => {
             const [view, setView] = useState('home');
             
-            // 1. BASELINE LEVERS (The Costing Variables)
+            // 1. BASELINE LEVERS (Explicitly modifiable)
             const [levers, setLevers] = useState({
-                internalRate: 125,
-                externalRate: 240,
-                autoTargetHours: 2,
-                fteBaseHours: 1800
+                inCountryRate: 115,
+                coeRate: 42,
+                auditRate: 185,
+                autoTestTarget: 2,
+                coeEfficiencyLift: 30 // Now explicit and modifiable
             });
 
-            // 2. RCM DNA
+            // 2. RCM HIERARCHY DATA
             const [rcmData, setRcmData] = useState([
-                { id: 1, country: "Italy", sub: "Revenue Recognition", type: "Manual", testH: 60, res: "Internal" },
-                { id: 2, country: "Germany", sub: "Journal Entries", type: "Manual", testH: 45, res: "External" }
+                { id: 1, cycle: "P2P", process: "Accounts Payable", sub: "Payment Run", activity: "Payment Proposal Review", country: "Italy", execH: 120, testH: 60, status: "In-Country", type: "Manual" },
+                { id: 2, cycle: "R2R", process: "General Ledger", sub: "Journal Entries", activity: "Manual JE Approval", country: "Germany", execH: 95, testH: 45, status: "In-Country", type: "Manual" }
             ]);
 
-            // 3. ANALYTICS
-            const stats = useMemo(() => {
-                const auditSavings = rcmData.reduce((acc, c) => {
+            // 3. TRANSFORMATION ENGINE
+            const analysis = useMemo(() => {
+                const results = rcmData.reduce((acc, c) => {
+                    // Operational Dividend (Performance Shift with Explicit Lift)
+                    if (c.status === "COE") {
+                        const localCost = c.execH * levers.inCountryRate;
+                        const efficiencyFactor = 1 - (levers.coeEfficiencyLift / 100);
+                        const coeCost = (c.execH * efficiencyFactor) * levers.coeRate;
+                        acc.opSavings += (localCost - coeCost);
+                    }
+                    // Audit Dividend (Testing Shift)
                     if (c.type === "ITAC") {
-                        const rate = c.res === "Internal" ? levers.internalRate : levers.externalRate;
-                        return acc + ((c.testH - levers.autoTargetHours) * rate);
+                        acc.auditSavings += ((c.testH - levers.autoTestTarget) * levers.auditRate);
                     }
                     return acc;
-                }, 0);
-                const maturity = Math.round((rcmData.filter(c => c.type === "ITAC").length / rcmData.length) * 100) || 0;
-                return { auditSavings, maturity };
+                }, { opSavings: 0, auditSavings: 0 });
+
+                return results;
             }, [rcmData, levers]);
 
             const StructuralLogo = () => (
@@ -61,7 +68,7 @@
                     </svg>
                     <div className="flex flex-col">
                         <span className="text-2xl font-extrabold text-slate-900 tracking-tighter leading-none italic">Radix</span>
-                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-[0.2em] mt-1">
+                        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">
                             {view === 'home' ? 'Process Transformation' : 
                              view === 'ingest' ? 'Bifurcation Architect' : 'Baseline Modeling'}
                         </span>
@@ -74,72 +81,73 @@
                     <nav className="nav-glass sticky top-0 z-50 px-10 py-6 flex justify-between items-center">
                         <button onClick={() => setView('home')}><StructuralLogo /></button>
                         <div className="flex gap-10">
-                            <button onClick={() => setView('ingest')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='ingest'?'text-indigo-600':'text-slate-400 hover:text-indigo-400'}`}>Ingest DNA</button>
-                            <button onClick={() => setView('config')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='config'?'text-indigo-600':'text-slate-400 hover:text-indigo-400'}`}>Baseline</button>
+                            <button onClick={() => setView('ingest')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='ingest'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Ingest DNA</button>
+                            <button onClick={() => setView('config')} className={`text-[10px] font-extrabold uppercase tracking-widest ${view==='config'?'text-indigo-600 underline underline-offset-8':'text-slate-400'}`}>Baseline</button>
                         </div>
                     </nav>
 
                     <main className="max-w-7xl mx-auto p-12 space-y-12">
                         {view === 'home' && (
-                            <div className="space-y-10 animate-in fade-in duration-700">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                    <div className="bg-indigo-950 p-12 rounded-[3.5rem] text-white card-shadow">
-                                        <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Audit Dividend</h3>
-                                        <p className="text-5xl font-extrabold italic text-emerald-400">${stats.auditSavings.toLocaleString()}</p>
-                                        <p className="text-sm text-slate-400 mt-4 font-medium italic">Projected Annual Cost Avoidance</p>
-                                    </div>
-                                    <div className="bg-white p-12 rounded-[3.5rem] border border-slate-100 card-shadow flex flex-col justify-center">
-                                        <h3 className="text-2xl font-extrabold italic text-slate-900 tracking-tight">Digital Maturity</h3>
-                                        <div className="mt-4 flex items-center gap-6">
-                                            <p className="text-4xl font-extrabold text-indigo-600 italic">{stats.maturity}%</p>
-                                            <div className="flex-1 bg-slate-50 h-2 rounded-full overflow-hidden">
-                                                <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${stats.maturity}%` }}></div>
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-1000">
+                                <div className="bg-indigo-950 p-12 rounded-[3.5rem] text-white card-shadow border-t-8 border-indigo-500">
+                                    <h3 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-4">Operational Dividend (SSC/COE)</h3>
+                                    <p className="text-5xl font-extrabold italic text-emerald-400">${Math.round(analysis.opSavings).toLocaleString()}</p>
+                                    <p className="text-sm text-slate-400 mt-4 italic font-medium">Reclaimed In-Country Capacity @ {levers.coeEfficiencyLift}% Lift</p>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6">
-                                    <button onClick={()=>setView('ingest')} className="bg-white p-12 rounded-[3rem] border border-slate-100 hover:border-indigo-500 card-shadow transition-all text-left group">
-                                        <h3 className="text-2xl font-extrabold italic mb-2 tracking-tight group-hover:text-indigo-600 transition-colors">Bifurcation Architect</h3>
-                                        <p className="text-sm text-slate-400 font-medium leading-relaxed">Map decentralized lineages and identify fragmentation nodes.</p>
-                                    </button>
-                                    <button onClick={()=>setView('config')} className="bg-white p-12 rounded-[3rem] border border-slate-100 hover:border-indigo-500 card-shadow transition-all text-left group">
-                                        <h3 className="text-2xl font-extrabold italic mb-2 tracking-tight group-hover:text-indigo-600 transition-colors">Baseline Modeling</h3>
-                                        <p className="text-sm text-slate-400 font-medium leading-relaxed">Configure the cost variables and unit testing hours for the ROI engine.</p>
-                                    </button>
+                                <div className="bg-white p-12 rounded-[3.5rem] border border-slate-100 card-shadow flex flex-col justify-center">
+                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Audit Cost Avoidance</h3>
+                                    <p className="text-5xl font-extrabold italic text-indigo-600">${Math.round(analysis.auditSavings).toLocaleString()}</p>
+                                    <p className="text-sm text-slate-400 mt-4 italic font-medium">Reduced Testing Friction ($n=1$)</p>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
-                            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-500">
                                 <div className="flex justify-between items-end">
-                                    <h2 className="text-3xl font-extrabold italic text-slate-900">Lineage Ingest</h2>
-                                    <button onClick={()=>setRcmData([...rcmData, {id: Date.now(), country: "New Country", sub: "Sub-Process", type: "Manual", testH: 40, res: "Internal"}])} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold text-[10px] uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">Add Control Node</button>
+                                    <h2 className="text-3xl font-extrabold italic text-slate-900 tracking-tight">RCM DNA Ingest</h2>
+                                    <button onClick={()=>setRcmData([...rcmData, {id: Date.now(), cycle: "Cycle", process: "Process", sub: "Sub", activity: "Activity", country: "Country", execH: 40, testH: 20, status: "In-Country", type: "Manual"}])} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 hover:bg-indigo-700">Add Control Activity</button>
                                 </div>
-                                <div className="bg-white rounded-[3.5rem] border border-slate-100 card-shadow overflow-hidden">
-                                    <table className="w-full text-left font-medium">
-                                        <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                            <tr><th className="px-12 py-8">Entity / Process Node</th><th className="px-12 py-8 text-center">Testing (h)</th><th className="px-12 py-8">Resource</th><th className="px-12 py-8 text-right">Strategy</th></tr>
+                                
+                                <div className="bg-white rounded-[3.5rem] border border-slate-100 card-shadow overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50/50 border-b text-[9px] font-extrabold text-slate-400 uppercase tracking-[0.15em]">
+                                            <tr>
+                                                <th className="px-10 py-8">Cycle / Process / Activity</th>
+                                                <th className="px-10 py-8">Geo</th>
+                                                <th className="px-10 py-8 text-center">Exec (h)</th>
+                                                <th className="px-10 py-8 text-center">Test (h)</th>
+                                                <th className="px-10 py-8 text-right">Strategic Action</th>
+                                            </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {rcmData.map((c, i) => (
-                                                <tr key={c.id} className="hover:bg-slate-50/30 transition-colors">
-                                                    <td className="px-12 py-8">
-                                                        <input value={c.sub} onChange={e=>{const n=[...rcmData]; n[i].sub=e.target.value; setRcmData(n)}} className="font-extrabold text-slate-900 text-base italic uppercase bg-transparent outline-none focus:text-indigo-600 block w-full mb-1" />
-                                                        <input value={c.country} onChange={e=>{const n=[...rcmData]; n[i].country=e.target.value; setRcmData(n)}} className="text-[10px] font-bold text-slate-400 uppercase bg-transparent outline-none w-full" />
+                                                <tr key={c.id} className="hover:bg-slate-50/30 transition-colors group">
+                                                    <td className="px-10 py-8">
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <input value={c.cycle} onChange={e=>{const n=[...rcmData]; n[i].cycle=e.target.value; setRcmData(n)}} className="text-[10px] font-black text-indigo-500 uppercase bg-transparent w-12 focus:outline-none" />
+                                                                <span className="text-slate-200">/</span>
+                                                                <input value={c.process} onChange={e=>{const n=[...rcmData]; n[i].process=e.target.value; setRcmData(n)}} className="text-[10px] font-bold text-slate-400 uppercase bg-transparent focus:outline-none" />
+                                                            </div>
+                                                            <input value={c.activity} onChange={e=>{const n=[...rcmData]; n[i].activity=e.target.value; setRcmData(n)}} className="font-extrabold text-slate-900 text-base italic uppercase tracking-tighter bg-transparent focus:outline-none focus:text-indigo-600 w-full" />
+                                                            <input value={c.sub} onChange={e=>{const n=[...rcmData]; n[i].sub=e.target.value; setRcmData(n)}} className="text-[10px] font-bold text-slate-400 bg-transparent focus:outline-none" />
+                                                        </div>
                                                     </td>
-                                                    <td className="px-12 py-8 text-center">
-                                                        <input type="number" value={c.testH} onChange={e=>{const n=[...rcmData]; n[i].testH=Number(e.target.value); setRcmData(n)}} className="w-16 bg-slate-50 p-2 rounded-xl font-bold text-center outline-none focus:ring-2 focus:ring-indigo-100" />
+                                                    <td className="px-10 py-8">
+                                                        <input value={c.country} onChange={e=>{const n=[...rcmData]; n[i].country=e.target.value; setRcmData(n)}} className="text-[10px] font-extrabold text-slate-500 uppercase bg-transparent w-full focus:outline-none" />
                                                     </td>
-                                                    <td className="px-12 py-8">
-                                                        <select value={c.res} onChange={e=>{const n=[...rcmData]; n[i].res=e.target.value; setRcmData(n)}} className="bg-transparent font-bold text-xs text-indigo-600 outline-none">
-                                                            <option value="Internal">Internal IA</option>
-                                                            <option value="External">External Partner</option>
-                                                        </select>
+                                                    <td className="px-10 py-8 text-center">
+                                                        <input type="number" value={c.execH} onChange={e=>{const n=[...rcmData]; n[i].execH=Number(e.target.value); setRcmData(n)}} className="w-12 bg-slate-50 p-2 rounded-xl font-bold text-center text-xs" />
                                                     </td>
-                                                    <td className="px-12 py-8 text-right">
-                                                        <button onClick={()=>{const n=[...rcmData]; n[i].type='ITAC'; setRcmData(n)}} className={`text-[10px] font-extrabold uppercase underline underline-offset-8 decoration-2 ${c.type==='ITAC'?'text-slate-200 pointer-events-none':'text-emerald-600 hover:text-emerald-700'}`}>Automate</button>
+                                                    <td className="px-10 py-8 text-center">
+                                                        <input type="number" value={c.testH} onChange={e=>{const n=[...rcmData]; n[i].testH=Number(e.target.value); setRcmData(n)}} className="w-12 bg-slate-50 p-2 rounded-xl font-bold text-center text-xs" />
+                                                    </td>
+                                                    <td className="px-10 py-8 text-right">
+                                                        <div className="flex flex-col gap-2 items-end">
+                                                            <button onClick={()=>{const n=[...rcmData]; n[i].status='COE'; setRcmData(n)}} className={`text-[9px] font-black uppercase tracking-widest ${c.status==='COE'?'text-slate-200 pointer-events-none':'text-indigo-600 underline'}`}>Shift to COE</button>
+                                                            <button onClick={()=>{const n=[...rcmData]; n[i].type='ITAC'; setRcmData(n)}} className={`text-[9px] font-black uppercase tracking-widest ${c.type==='ITAC'?'text-slate-200 pointer-events-none':'text-emerald-600 underline'}`}>Automate</button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -151,23 +159,34 @@
 
                         {view === 'config' && (
                             <div className="bg-white p-12 rounded-[4rem] border border-slate-100 card-shadow animate-in fade-in duration-500">
-                                <h2 className="text-3xl font-extrabold italic mb-12 text-slate-900 tracking-tight">Baseline Modeling</h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <h2 className="text-3xl font-extrabold italic mb-12 text-slate-900 tracking-tight text-indigo-950">Baseline Modeling</h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
                                     <div className="space-y-10">
                                         <div>
-                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-3">Internal IA Rate ($/h)</label>
-                                            <input type="number" value={levers.internalRate} onChange={e=>setLevers({...levers, internalRate: Number(e.target.value)})} className="w-full p-5 bg-slate-50 rounded-2xl font-bold border-2 border-slate-50 input-focus transition-all" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-3">External Partner Rate ($/h)</label>
-                                            <input type="number" value={levers.externalRate} onChange={e=>setLevers({...levers, externalRate: Number(e.target.value)})} className="w-full p-5 bg-slate-50 rounded-2xl font-bold border-2 border-slate-50 input-focus transition-all" />
+                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-4">Centralization Efficiency</label>
+                                            <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                                                <span className="text-xs font-bold text-indigo-900 italic uppercase block mb-2">COE Efficiency Lift (%)</span>
+                                                <div className="flex items-center gap-4">
+                                                    <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e=>setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="flex-1 accent-indigo-600" />
+                                                    <span className="font-black text-indigo-600 text-xl">{levers.coeEfficiencyLift}%</span>
+                                                </div>
+                                                <p className="mt-4 text-[10px] text-indigo-400 font-medium leading-relaxed italic">"Assumed percentage of labor hours reduced through standardization and process consolidation within the COE."</p>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="space-y-10">
                                         <div>
-                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest block mb-3">Target Testing Hours ($n=1$)</label>
-                                            <input type="number" value={levers.autoTargetHours} onChange={e=>setLevers({...levers, autoTargetHours: Number(e.target.value)})} className="w-full p-5 bg-indigo-50 rounded-2xl font-bold text-indigo-600 border-2 border-indigo-50 input-focus transition-all shadow-inner" />
-                                            <p className="mt-4 text-xs text-slate-400 italic font-medium leading-relaxed">Define the testing burden goal for automated ITACs or system-generated reconciliations.</p>
+                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest block mb-4">Labor Rates ($/h)</label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <span className="text-[9px] font-bold text-slate-400 mb-1 block">In-Country</span>
+                                                    <input type="number" value={levers.inCountryRate} onChange={e=>setLevers({...levers, inCountryRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-slate-50 focus:border-indigo-100 outline-none" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] font-bold text-slate-400 mb-1 block">COE / SSC</span>
+                                                    <input type="number" value={levers.coeRate} onChange={e=>setLevers({...levers, coeRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-2 border-slate-50 focus:border-indigo-100 outline-none" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
