@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix | Capacity Architect</title>
+    <title>Radix | Operational ROI Architect</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,7 +11,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.015em; }
-        .capacity-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
 <body class="bg-[#fcfdfe] text-slate-800">
@@ -23,39 +22,44 @@
         const App = () => {
             const [view, setView] = useState('home');
             
-            // 1. GOVERNANCE & ECONOMICS (THE LEVERS)
+            // 1. GOVERNANCE & ECONOMICS
             const [levers, setLevers] = useState({
-                internalRate: 125,
-                externalRate: 250,
-                ebitdaBase: 41218000,
-                autoTargetHours: 2 // Targeted hours for an automated ITAC
+                localRate: 110,   // Local specialist rate
+                coeRate: 45,      // Shared services rate
+                internalAuditRate: 125,
+                autoTargetHours: 2 
             });
 
-            // 2. RCM DNA (Capturing specific Hours per Control)
+            // 2. RCM DNA (Capturing Execution vs Testing)
             const [rcmData, setRcmData] = useState([
-                { id: 1, country: "USA", sub: "Invoice Matching", type: "Manual", manualHours: 60, resource: "Internal" },
-                { id: 2, country: "UK", sub: "Journal Entries", type: "Manual", manualHours: 45, resource: "External" },
-                { id: 3, country: "Germany", sub: "Inventory Counts", type: "Manual", manualHours: 80, resource: "External" }
+                { id: 1, country: "Italy", sub: "Revenue Recognition", type: "Manual", executionHours: 120, testingHours: 60, status: "Local" },
+                { id: 2, country: "Germany", sub: "Journal Entries", type: "Manual", executionHours: 85, testingHours: 45, status: "Local" },
+                { id: 3, country: "UK", sub: "Bank Recon", type: "Manual", executionHours: 150, testingHours: 40, status: "Local" }
             ]);
 
-            // 3. CAPACITY ENGINE
+            // 3. THE DOUBLE DIVIDEND ENGINE
             const analysis = useMemo(() => {
-                const totalManualHours = rcmData.reduce((acc, c) => acc + (c.type === "Manual" ? c.manualHours : levers.autoTargetHours), 0);
+                const totalLocalHours = rcmData.filter(c => c.status === "Local").reduce((acc, c) => acc + c.executionHours, 0);
                 
-                const controlDebt = rcmData.reduce((acc, c) => {
-                    if (c.type === "Manual") {
-                        const rate = c.resource === "Internal" ? levers.internalRate : levers.externalRate;
-                        const wastedHours = c.manualHours - levers.autoTargetHours;
-                        return acc + (wastedHours * rate);
+                // Operational Dividend: Savings from Performance shift + Arbitrage
+                const opDividend = rcmData.reduce((acc, c) => {
+                    if (c.status === "COE") {
+                        const localCost = c.executionHours * levers.localRate;
+                        const coeCost = (c.executionHours * 0.6) * levers.coeRate; // Assuming 40% efficiency gain in COE
+                        return acc + (localCost - coeCost);
                     }
                     return acc;
                 }, 0);
 
-                const hoursSaved = rcmData.reduce((acc, c) => {
-                    return acc + (c.type === "ITAC" ? (c.manualHours - levers.autoTargetHours) : 0);
+                // Audit Dividend: Savings from Testing shift
+                const auditDividend = rcmData.reduce((acc, c) => {
+                    if (c.type === "ITAC") {
+                        return acc + ((c.testingHours - levers.autoTargetHours) * levers.internalAuditRate);
+                    }
+                    return acc;
                 }, 0);
 
-                return { totalManualHours, controlDebt, hoursSaved };
+                return { totalLocalHours, opDividend, auditDividend };
             }, [rcmData, levers]);
 
             return (
@@ -67,8 +71,8 @@
                                 <span className="text-xl font-extrabold text-slate-900 italic">Radix <span className="text-indigo-600">Architect</span></span>
                             </div>
                             <div className="flex gap-8">
-                                <button onClick={() => setView('config')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='config'?'text-indigo-600':'text-slate-400'}`}>Rates & Targets</button>
-                                <button onClick={() => setView('ingest')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600':'text-slate-400'}`}>Capacity Mapping</button>
+                                <button onClick={() => setView('config')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='config'?'text-indigo-600':'text-slate-400'}`}>Rates & Levers</button>
+                                <button onClick={() => setView('ingest')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='ingest'?'text-indigo-600':'text-slate-400'}`}>Operational Mapping</button>
                                 <button onClick={() => setView('home')} className={`text-[10px] font-bold uppercase tracking-widest ${view==='home'?'text-indigo-600':'text-slate-400'}`}>Portal</button>
                             </div>
                         </div>
@@ -78,51 +82,43 @@
                         {view === 'home' && (
                             <div className="space-y-12">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Total Audit Hours</p>
-                                        <p className="text-4xl font-extrabold text-slate-900 italic">{analysis.totalManualHours}h</p>
-                                    </div>
-                                    <div className="bg-indigo-950 p-10 rounded-[2.5rem] text-white shadow-xl">
-                                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Capacity Reclaimed</p>
-                                        <p className="text-4xl font-extrabold text-emerald-400 italic">+{analysis.hoursSaved}h</p>
+                                    <div className="bg-indigo-950 p-10 rounded-[2.5rem] text-white shadow-xl border-l-8 border-emerald-400">
+                                        <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Operational Dividend</p>
+                                        <p className="text-4xl font-extrabold text-emerald-400 italic">${Math.round(analysis.opDividend).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase">Local Capacity Reclaimed</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Cost of Debt</p>
-                                        <p className="text-4xl font-extrabold text-rose-500 italic">${Math.round(analysis.controlDebt).toLocaleString()}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Audit Dividend</p>
+                                        <p className="text-4xl font-extrabold text-indigo-600 italic">${Math.round(analysis.auditDividend).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase italic">"Testing Debt Retired"</p>
+                                    </div>
+                                    <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Current Local Burden</p>
+                                        <p className="text-4xl font-extrabold text-slate-900 italic">{analysis.totalLocalHours}h</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase">Execution Hours in Countries</p>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <button onClick={()=>setView('ingest')} className="bg-white p-12 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-500 transition-all text-left group shadow-sm">
-                                        <h3 className="text-2xl font-extrabold italic mb-2">Capacity Mapping</h3>
-                                        <p className="text-sm text-slate-400">Capture the specific hours required for manual testing vs. automated targets.</p>
-                                    </button>
-                                    <button onClick={()=>setView('config')} className="bg-white p-12 rounded-[3rem] border-2 border-slate-50 hover:border-indigo-500 transition-all text-left shadow-sm">
-                                        <h3 className="text-2xl font-extrabold italic mb-2">Rates & Levers</h3>
-                                        <p className="text-sm text-slate-400">Define internal vs. external resource costs and ITAC hour targets.</p>
+                                        <h3 className="text-2xl font-extrabold italic mb-2 tracking-tight text-slate-800">Operational DNA</h3>
+                                        <p className="text-sm text-slate-400">Map local performance hours and trigger COE Standardization.</p>
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {view === 'config' && (
-                            <div className="bg-white p-12 rounded-[3rem] border shadow-sm animate-in fade-in duration-500">
-                                <h2 className="text-3xl font-extrabold italic mb-10 text-indigo-950">Resource Economics</h2>
+                            <div className="bg-white p-12 rounded-[3rem] border shadow-sm">
+                                <h2 className="text-3xl font-extrabold italic mb-10 text-indigo-950">Labor & Efficiency Levers</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-6">
                                         <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Internal IA Rate ($/hr)</label>
-                                            <input type="number" value={levers.internalRate} onChange={e=>setLevers({...levers, internalRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Local Specialist Rate ($/hr)</label>
+                                            <input type="number" value={levers.localRate} onChange={e=>setLevers({...levers, localRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">External Audit Rate ($/hr)</label>
-                                            <input type="number" value={levers.externalRate} onChange={e=>setLevers({...levers, externalRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-6">
-                                        <div>
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Automated Control Target (Hours)</label>
-                                            <input type="number" value={levers.autoTargetHours} onChange={e=>setLevers({...levers, autoTargetHours: Number(e.target.value)})} className="w-full p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-100 font-bold text-indigo-600" />
-                                            <p className="mt-2 text-[10px] text-slate-400 italic">Total hours to query system metadata vs. full manual walk-through.</p>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">COE / Shared Service Rate ($/hr)</label>
+                                            <input type="number" value={levers.coeRate} onChange={e=>setLevers({...levers, coeRate: Number(e.target.value)})} className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-slate-100 font-bold" />
                                         </div>
                                     </div>
                                 </div>
@@ -131,50 +127,37 @@
 
                         {view === 'ingest' && (
                             <div className="space-y-8 animate-in fade-in duration-500">
-                                <div className="flex justify-between items-center">
-                                    <h2 className="text-3xl font-extrabold italic text-indigo-950">Capacity Ingest</h2>
-                                    <button onClick={() => setRcmData([...rcmData, {id: Date.now(), country: "Entity", sub: "New Process", type: "Manual", manualHours: 40, resource: "Internal"}])} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg">Add Control Node</button>
-                                </div>
+                                <h2 className="text-3xl font-extrabold italic text-indigo-950">Capacity Mapping Matrix</h2>
                                 <div className="bg-white rounded-[3rem] border shadow-sm overflow-hidden">
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-50/50 border-b text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                             <tr>
-                                                <th className="px-10 py-6">Process Node</th>
-                                                <th className="px-10 py-6">Resource Type</th>
-                                                <th className="px-10 py-6">Manual Hours/Year</th>
-                                                <th className="px-10 py-6">Action</th>
+                                                <th className="px-10 py-6">Entity / Sub-Process</th>
+                                                <th className="px-10 py-6 text-center">Execution (h/yr)</th>
+                                                <th className="px-10 py-6 text-center">Testing (h/yr)</th>
+                                                <th className="px-10 py-6">Strategy</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50">
                                             {rcmData.map((c, i) => (
                                                 <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-10 py-6">
-                                                        <p className="font-extrabold text-slate-900 mb-1 italic">{c.sub}</p>
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{c.country}</span>
+                                                        <p className="font-extrabold text-slate-900 italic uppercase tracking-tight">{c.sub}</p>
+                                                        <span className="text-[10px] font-bold text-slate-400">{c.country} ({c.status})</span>
+                                                    </td>
+                                                    <td className="px-10 py-6 text-center">
+                                                        <input type="number" value={c.executionHours} onChange={e=>{const n=[...rcmData]; n[i].executionHours=Number(e.target.value); setRcmData(n)}} className="w-16 bg-slate-50 p-2 rounded-lg font-bold text-center" />
+                                                    </td>
+                                                    <td className="px-10 py-6 text-center">
+                                                        <input type="number" value={c.testingHours} onChange={e=>{const n=[...rcmData]; n[i].testingHours=Number(e.target.value); setRcmData(n)}} className="w-16 bg-slate-50 p-2 rounded-lg font-bold text-center" />
                                                     </td>
                                                     <td className="px-10 py-6">
-                                                        <select 
-                                                            value={c.resource} 
-                                                            onChange={e=>{const n=[...rcmData]; n[i].resource=e.target.value; setRcmData(n)}}
-                                                            className="bg-transparent font-bold text-xs text-indigo-600 border-none outline-none"
-                                                        >
-                                                            <option value="Internal">Internal (IA)</option>
-                                                            <option value="External">External (Partner)</option>
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-10 py-6">
-                                                        <div className="flex items-center gap-2">
-                                                            <input type="number" value={c.manualHours} onChange={e=>{const n=[...rcmData]; n[i].manualHours=Number(e.target.value); setRcmData(n)}} className="w-16 bg-slate-50 p-2 rounded-lg font-bold text-slate-700" />
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Hours</span>
+                                                        <div className="flex gap-4">
+                                                            {c.status === 'Local' && (
+                                                                <button onClick={()=>{const n=[...rcmData]; n[i].status='COE'; setRcmData(n)}} className="text-[10px] font-extrabold text-indigo-600 uppercase underline underline-offset-4">Shift to COE</button>
+                                                            )}
+                                                            <button onClick={()=>{const n=[...rcmData]; n[i].type='ITAC'; setRcmData(n)}} className="text-[10px] font-extrabold text-emerald-600 uppercase underline underline-offset-4">Automate</button>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-10 py-6">
-                                                        <button 
-                                                            onClick={()=>{const n=[...rcmData]; n[i].type='ITAC'; setRcmData(n)}}
-                                                            className={`text-[10px] font-extrabold uppercase tracking-widest underline underline-offset-4 ${c.type === 'ITAC' ? 'text-slate-300 pointer-events-none' : 'text-emerald-600'}`}
-                                                        >
-                                                            {c.type === 'ITAC' ? 'Automated' : 'Retire Debt'}
-                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
