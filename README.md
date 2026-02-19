@@ -19,12 +19,12 @@ Quantify the inherent risk of manual processes. Our proprietary algorithm calcul
 ### 🛡️ Skepticism Challenge: The "Columbo" Method
 Interactive branching dialogues where users navigate management excuses (e.g., "I misunderstood the request" or "The Manager was on vacation"). Learn to separate subjective intent from objective audit trails.
 
-### 📱 PWA Enabled
+(NOT) ### 📱 PWA Enabled (reverted to HTML)
 Designed for the modern, mobile auditor. Installable on **iPad, iPhone, and Laptop** without an App Store middleman.
 
 ---
 
-## 🛠 Tech Stack
+## 🛠 Tech Stack (old - replaced with single HTML)
 * **Frontend:** React.js + Tailwind CSS
 * **Deployment:** GitHub Pages
 * **Architecture:** Progressive Web App (PWA)
