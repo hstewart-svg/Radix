@@ -1,5 +1,5 @@
 # Radix (v1) OLD DO NOT USE
-Architecting Robust Processes through Critical Thinking and Automation
+Architecting Robust Global Processes through Critical Thinking and Automation
 # Inquiry: The Critical Thinking Lab for Auditors
 
 **Inquiry** is a high-fidelity "cognitive flight simulator" designed for senior Internal Audit and SOX professionals. It moves beyond the "checklist mentality" to train auditors in **Professional Skepticism**, **Systemic Root Cause Analysis**, and **Automation Advocacy**.
