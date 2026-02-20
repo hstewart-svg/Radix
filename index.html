@@ -3,50 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix | Process Transformation Architect</title>
+    <title>Radix | Global Transformation Architect</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-        
-        * { 
-            font-family: 'Plus Jakarta Sans', sans-serif !important; 
-            -webkit-font-smoothing: antialiased;
-        }
-        
-        body { 
-            background: #fcfdfe; 
-            color: #0f172a; 
-            margin: 0;
-        }
-
-        .nav-blur { 
-            background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(20px); 
-            border-bottom: 1px solid #f1f5f9; 
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo-svg {
-            width: 32px;
-            height: 32px;
-            fill: #4f46e5;
-        }
-
-        .card-ui { 
-            background: #ffffff; 
-            border: 1px solid #f1f5f9; 
-            border-radius: 24px; 
-            box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); 
-        }
-
+        * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
+        body { background: #fcfdfe; color: #0f172a; margin: 0; }
+        .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
+        .logo-mark { color: #4f46e5; font-weight: 800; font-size: 24px; letter-spacing: -1px; }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 24px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
@@ -70,7 +38,7 @@
 
             const [rcmData, setRcmData] = useState([
                 { id: 1, cycle: "P2P", process: "Accounts Payable", controlName: "PMT-01", activity: "Manager reviews the payment proposal report and matches totals to invoice register.", country: "Italy", execH: 140, testH: 60, status: "Local", nature: "Manual", complexity: 1.2, wave: 1, res: "Internal" },
-                { id: 2, cycle: "R2R", process: "General Ledger", controlName: "GL-05", activity: "Manual Journal Entry review for high-value items.", country: "Germany", execH: 95, testH: 45, status: "Local", nature: "Manual", complexity: 1.0, wave: 2, res: "External" }
+                { id: 2, cycle: "R2R", process: "General Ledger", controlName: "GL-05", activity: "Manual Journal Entry review for items exceeding the corporate threshold.", country: "Germany", execH: 95, testH: 45, status: "Local", nature: "Manual", complexity: 1.0, wave: 2, res: "External" }
             ]);
 
             const analysis = useMemo(() => {
@@ -113,8 +81,8 @@
             };
 
             const LogoMark = () => (
-                <div className="logo-container">
-                    <svg viewBox="0 0 100 100" className="logo-svg">
+                <div className="flex items-center gap-4">
+                    <svg viewBox="0 0 100 100" className="w-8 h-8 fill-indigo-600">
                         <rect x="10" y="10" width="25" height="80" rx="4" />
                         <path d="M35 10 H65 C85 10 85 45 65 45 H35 V10 Z" />
                         <path d="M50 45 L85 90 H60 L35 55 V45 Z" />
@@ -148,13 +116,13 @@
                                         <p className="text-5xl font-bold">${Math.round(analysis.totalOp).toLocaleString()}</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 flex flex-col justify-between min-h-[180px]">
-                                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Audit cost avoidance</p>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Audit dividend</p>
                                         <p className="text-5xl font-bold text-indigo-600">${Math.round(analysis.totalAudit).toLocaleString()}</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-6">
-                                    <h2 className="text-2xl font-bold text-slate-900">Standardization roadmap</h2>
+                                    <h2 className="text-2xl font-bold text-slate-900">Global standardization roadmap</h2>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                         {[1, 2, 3].map(w => (
                                             <div key={w} className="card-ui p-8">
@@ -194,13 +162,13 @@
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Entity</label>
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 tracking-wider">Entity</label>
                                                         <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs font-bold appearance-none">
                                                             {EUROPE_LIST.map(co => <option key={co} value={co}>{co}</option>)}
                                                         </select>
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Complexity</label>
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1 tracking-wider">Complexity</label>
                                                         <input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="w-full bg-slate-50 border-none rounded-xl p-2.5 text-xs font-bold text-center" />
                                                     </div>
                                                 </div>
@@ -220,17 +188,17 @@
                                                         </select>
                                                     </div>
                                                     <div className="flex-1">
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">IA resource pool</label>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Testing pool</label>
                                                         <select value={c.res} onChange={e => updateNode(c.id, 'res', e.target.value)} className="text-[11px] font-bold bg-slate-100 px-4 py-2 rounded-xl border-none w-full">
                                                             <option value="Internal">Internal IA</option><option value="External">External Partner</option>
                                                         </select>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-4 w-full sm:w-auto">
-                                                    <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'COE' : 'Local')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase transition-all ${c.status === 'COE' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>
+                                                    <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'COE' : 'Local')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase tracking-wider transition-all ${c.status === 'COE' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-900 text-white'}`}>
                                                         {c.status === 'Local' ? 'Shift to COE' : '✓ In COE'}
                                                     </button>
-                                                    <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-indigo-600 text-white'}`}>
+                                                    <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase tracking-wider transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-indigo-600 text-white'}`}>
                                                         {c.nature === 'Manual' ? 'Automate' : '✓ Automated'}
                                                     </button>
                                                 </div>
@@ -239,11 +207,11 @@
                                     ))}
                                 </div>
 
-                                <div className="bg-slate-950 p-10 rounded-[2.5rem] text-white">
+                                <div className="bg-slate-950 p-10 rounded-[2.5rem] text-white shadow-2xl">
                                     <h3 className="text-xl font-bold mb-4">Bulk RCM osmosis</h3>
                                     <p className="text-[10px] text-slate-500 uppercase font-bold mb-8 tracking-widest leading-relaxed">Format: Cycle, Process, Name, Activity, Country, ExecH, TestH, Comp, Wave, Nature, Res</p>
                                     <textarea value={csvInput} onChange={e => setCsvInput(e.target.value)} placeholder="P2P, AP, PMT-01, Manual Review..., Italy, 120, 60, 1.2, 1, Manual, Internal" className="w-full h-32 bg-slate-900 rounded-[20px] p-6 text-xs font-mono text-indigo-300 focus:outline-none ring-1 ring-slate-800" />
-                                    <button onClick={handleCsvIngest} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-bold uppercase text-xs mt-8 hover:bg-indigo-400 transition-all shadow-xl shadow-indigo-950">Execute bulk ingest</button>
+                                    <button onClick={handleCsvIngest} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-black uppercase text-xs mt-8 hover:bg-indigo-400 transition-all shadow-xl shadow-indigo-950">Execute bulk ingest</button>
                                 </div>
                             </div>
                         )}
