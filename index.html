@@ -14,7 +14,7 @@
         body { background: #fcfdfe; color: #0f172a; margin: 0; }
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
         .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 24px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
-        .waterfall-bar { transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); height: 8px; border-radius: 99px; }
+        .heatmap-cell { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
@@ -25,58 +25,52 @@
     <script type="text/babel">
         const { useState, useMemo } = React;
 
-        const EUROPE_LIST = ["Austria", "Belgium", "Denmark", "Finland", "France", "Germany", "Ireland", "Italy", "Luxembourg", "Netherlands", "Norway", "Spain", "Sweden", "Switzerland", "United Kingdom"];
+        const HUB_MAP = {
+            "DACH": ["Germany", "Austria", "Switzerland"],
+            "Nordics": ["Denmark", "Finland", "Norway", "Sweden"],
+            "Southern": ["Italy", "Spain", "France"],
+            "UK/IE": ["United Kingdom", "Ireland"],
+            "Benelux": ["Belgium", "Netherlands", "Luxembourg"]
+        };
 
         const App = () => {
             const [view, setView] = useState('home');
-            
-            const [levers, setLevers] = useState({
+            const [levers] = useState({
                 localRate: 115, sharedServiceRate: 45, internalAuditRate: 125, externalAuditRate: 245,
                 autoTestTarget: 2, coeEfficiencyLift: 35
             });
 
-            const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "P2P", process: "AP", controlName: "PMT-01", activity: "Manual payment proposal review.", country: "Italy", execH: 140, testH: 60, status: "Local", nature: "Manual", complexity: 1.2, wave: 1, res: "Internal" },
-                { id: 2, cycle: "R2R", process: "GL", controlName: "GL-05", activity: "Journal entry approval manual steps.", country: "Germany", execH: 110, testH: 45, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "External" },
-                { id: 3, cycle: "P2P", process: "AP", controlName: "PMT-01", activity: "Local validation of payment batches.", country: "France", execH: 90, testH: 30, status: "Local", nature: "Manual", complexity: 1.1, wave: 1, res: "Internal" }
+            const [rcmData] = useState([
+                { id: 1, country: "Italy", status: "Shared Service", execH: 140, testH: 60, complexity: 1.2, res: "Internal" },
+                { id: 2, country: "Germany", status: "Local", execH: 110, testH: 45, complexity: 1.0, res: "External" },
+                { id: 3, country: "France", status: "Local", execH: 90, testH: 30, complexity: 1.1, res: "Internal" },
+                { id: 4, country: "Austria", status: "Shared Service", execH: 70, testH: 20, complexity: 1.0, res: "Internal" }
             ]);
 
-            const analysis = useMemo(() => {
-                let totalPerfDebt = 0; let totalAuditDebt = 0; let totalDiv = 0;
-                const entityRollup = {};
+            const heatmapData = useMemo(() => {
+                const hubs = {};
+                Object.keys(HUB_MAP).forEach(h => hubs[h] = { debt: 0, nodes: 0, std: 0 });
 
                 rcmData.forEach(c => {
                     const auditRate = c.res === "Internal" ? levers.internalAuditRate : levers.externalAuditRate;
-                    const pDebt = c.execH * levers.localRate;
-                    const aDebt = c.testH * auditRate;
+                    const debt = (c.execH * levers.localRate) + (c.testH * auditRate);
+                    const hubName = Object.keys(HUB_MAP).find(h => HUB_MAP[h].includes(c.country)) || "Other";
                     
-                    totalPerfDebt += pDebt;
-                    totalAuditDebt += aDebt;
-
-                    if (!entityRollup[c.country]) entityRollup[c.country] = { p: 0, a: 0, total: 0 };
-                    entityRollup[c.country].p += pDebt;
-                    entityRollup[c.country].a += aDebt;
-                    entityRollup[c.country].total += (pDebt + aDebt);
-
-                    const netLift = levers.coeEfficiencyLift / c.complexity;
-                    const sharedCost = (c.execH * (1 - (netLift/100))) * levers.sharedServiceRate;
-                    if (c.status === "Shared Service") totalDiv += (pDebt - sharedCost);
-                    if (c.nature === "Automated") totalDiv += ((c.testH - levers.autoTestTarget) * auditRate);
+                    if (!hubs[hubName]) hubs[hubName] = { debt: 0, nodes: 0, std: 0 };
+                    hubs[hubName].debt += debt;
+                    hubs[hubName].nodes += 1;
+                    if (c.status === "Shared Service") hubs[hubName].std += 1;
                 });
 
-                const totalDebt = totalPerfDebt + totalAuditDebt;
-
-                return { 
-                    totalDebt, totalPerfDebt, totalAuditDebt, totalDiv,
-                    perfPct: (totalPerfDebt / totalDebt) * 100, 
-                    auditPct: (totalAuditDebt / totalDebt) * 100,
-                    entities: Object.entries(entityRollup).sort((a,b) => b[1].total - a[1].total)
-                };
+                return Object.entries(hubs)
+                    .filter(h => h[1].nodes > 0)
+                    .map(([name, data]) => ({
+                        name,
+                        debt: data.debt,
+                        maturity: Math.round((data.std / data.nodes) * 100)
+                    }))
+                    .sort((a,b) => b.debt - a.debt);
             }, [rcmData, levers]);
-
-            const updateNode = (id, field, value) => {
-                setRcmData(rcmData.map(n => n.id === id ? { ...n, [field]: value } : n));
-            };
 
             const LogoMark = () => (
                 <div className="flex items-center gap-4">
@@ -97,102 +91,84 @@
                     <nav className="nav-blur sticky top-0 z-50 px-6 py-5 flex justify-between items-center">
                         <LogoMark />
                         <div className="flex gap-2">
-                            {['home', 'ingest', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
-                                    {v === 'home' ? 'Map' : v === 'ingest' ? 'Architect' : 'Baseline'}
-                                </button>
-                            ))}
+                            <button onClick={() => setView('home')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === 'home' ? 'bg-indigo-600 text-white' : 'text-slate-500'}`}>Heatmap</button>
+                            <button className="px-4 py-2 text-xs font-bold text-slate-300 cursor-not-allowed">Architect</button>
                         </div>
                     </nav>
 
-                    <main className="max-w-5xl mx-auto px-6 mt-12 space-y-12">
-                        {view === 'home' && (
-                            <div className="space-y-12 animate-in fade-in duration-500">
-                                {/* WATERFALL RECAP */}
-                                <div className="card-ui p-10 space-y-8">
-                                    <div className="flex justify-between items-end">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Annual Enterprise Friction (USD)</p>
-                                            <p className="text-5xl font-extrabold text-slate-900">${Math.round(analysis.totalDebt).toLocaleString()}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Standardization Dividend</p>
-                                            <p className="text-3xl font-bold text-emerald-600">${Math.round(analysis.totalDiv).toLocaleString()}</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 border-t border-slate-50 pt-8">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500"><span>Stakeholder Labor</span><span>${Math.round(analysis.totalPerfDebt).toLocaleString()}</span></div>
-                                            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden"><div className="waterfall-bar bg-slate-900" style={{ width: `${analysis.perfPct}%` }}></div></div>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between text-[10px] font-bold uppercase text-indigo-400"><span>IA Testing / SOX</span><span>${Math.round(analysis.totalAuditDebt).toLocaleString()}</span></div>
-                                            <div className="w-full bg-indigo-50 rounded-full h-2 overflow-hidden"><div className="waterfall-bar bg-indigo-600" style={{ width: `${analysis.auditPct}%` }}></div></div>
-                                        </div>
-                                    </div>
-                                </div>
+                    <main className="max-w-5xl mx-auto px-6 mt-12 space-y-16">
+                        <div className="space-y-8">
+                            <div className="flex justify-between items-end">
+                                <h2 className="text-2xl font-bold text-slate-900">Regional hub maturity heatmap</h2>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Maturity vs. Fragmentation Debt</p>
+                            </div>
 
-                                {/* REGIONAL FRAGMENTATION DEBT LEADERBOARD */}
-                                <div className="space-y-6">
-                                    <h2 className="text-2xl font-bold text-slate-900">Fragmentation debt by entity</h2>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {analysis.entities.map(([ctry, data]) => (
-                                            <div key={ctry} className="card-ui p-6 flex flex-col sm:flex-row justify-between items-center gap-6">
-                                                <div className="flex items-center gap-4 w-full sm:w-1/3">
-                                                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center font-black text-slate-300 text-xs">{ctry.substring(0,2).toUpperCase()}</div>
-                                                    <div>
-                                                        <p className="text-sm font-extrabold text-slate-800 uppercase tracking-tight">{ctry}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Local Manual Debt</p>
-                                                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {heatmapData.map(hub => (
+                                    <div key={hub.name} className="card-ui p-10 flex flex-col justify-between group hover:border-indigo-200 transition-all">
+                                        <div className="flex justify-between items-start mb-12">
+                                            <div>
+                                                <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">{hub.name} Hub</h3>
+                                                <p className="text-xs font-bold text-slate-400 uppercase mt-1">Regional Cluster</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-3xl font-black text-slate-900">{hub.maturity}%</p>
+                                                <p className="text-[10px] font-bold text-indigo-500 uppercase">Standardized</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
+                                                    <span className="text-slate-400">Hub Transformation Maturity</span>
+                                                    <span className={hub.maturity > 50 ? 'text-emerald-500' : 'text-rose-400'}>
+                                                        {hub.maturity === 100 ? 'Optimized' : hub.maturity > 0 ? 'In Transition' : 'Manual Baseline'}
+                                                    </span>
                                                 </div>
-                                                <div className="flex-1 w-full space-y-2">
-                                                    <div className="flex justify-between text-[9px] font-bold uppercase tracking-tighter">
-                                                        <span className="text-slate-400">Labor: ${Math.round(data.p).toLocaleString()}</span>
-                                                        <span className="text-indigo-400">Audit: ${Math.round(data.a).toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="w-full bg-slate-50 h-3 rounded-full flex overflow-hidden">
-                                                        <div className="bg-slate-900 h-full transition-all" style={{ width: `${(data.p / data.total) * 100}%` }}></div>
-                                                        <div className="bg-indigo-600 h-full transition-all opacity-80" style={{ width: `${(data.a / data.total) * 100}%` }}></div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right w-full sm:w-1/4">
-                                                    <p className="text-xl font-black text-rose-500 italic">${Math.round(data.total).toLocaleString()}</p>
-                                                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Total Burden</p>
+                                                <div className="w-full bg-slate-100 h-6 rounded-2xl overflow-hidden p-1">
+                                                    <div 
+                                                        className={`heatmap-cell h-full rounded-xl ${hub.maturity === 100 ? 'bg-emerald-500' : 'bg-indigo-600 shadow-lg shadow-indigo-100'}`} 
+                                                        style={{ width: `${hub.maturity || 5}%` }}
+                                                    ></div>
                                                 </div>
                                             </div>
-                                        ))}
+
+                                            <div className="pt-6 border-t border-slate-50 flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Active Fragmentation Debt</p>
+                                                    <p className="text-2xl font-black text-rose-500 italic">${Math.round(hub.debt).toLocaleString()}</p>
+                                                </div>
+                                                <div className="w-12 h-12 rounded-full border-4 border-slate-50 flex items-center justify-center">
+                                                    <div className={`w-3 h-3 rounded-full animate-pulse ${hub.maturity > 70 ? 'bg-emerald-500' : hub.maturity > 30 ? 'bg-amber-400' : 'bg-rose-500'}`}></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ANALYTICAL LEGEND */}
+                        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-6 italic">How to read the heatmap</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
+                                <div className="space-y-2">
+                                    <div className="w-4 h-4 bg-rose-500 rounded-md"></div>
+                                    <p className="text-xs font-bold">Critical Risk</p>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">High Debt (> $200k) with < 30% standardization. Immediate Shared Service priority.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="w-4 h-4 bg-amber-400 rounded-md"></div>
+                                    <p className="text-xs font-bold">Active Transition</p>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">Moderate maturity (30-70%). Governance required to prevent "Shadow IT" local controls.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="w-4 h-4 bg-emerald-500 rounded-md"></div>
+                                    <p className="text-xs font-bold">Value Capture</p>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">High maturity (> 70%). Debt is being retired; focus on automation for the Audit Dividend.</p>
                                 </div>
                             </div>
-                        )}
-
-                        {view === 'ingest' && (
-                            <div className="space-y-10 animate-in slide-in-from-bottom-4">
-                                <div className="flex justify-between items-center">
-                                    <h2 className="text-2xl font-bold text-slate-900">Control architecture</h2>
-                                    <button onClick={() => setRcmData([{ id: Date.now(), cycle: "", process: "", controlName: "", activity: "", country: "Germany", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "Internal" }, ...rcmData])} className="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100">+ Add node</button>
-                                </div>
-                                <div className="space-y-6">
-                                    {rcmData.map(c => (
-                                        <div key={c.id} className="card-ui p-8 space-y-6 border-l-8 border-indigo-100">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                <input placeholder="Control ID" value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-2xl font-bold w-full bg-transparent border-b border-slate-100 pb-2 focus:outline-none" />
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Execution (h)</label><input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="w-full bg-slate-50 rounded-xl p-3 text-xs font-bold text-center border-none" /></div>
-                                                    <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Testing (h)</label><input type="number" value={c.testH} onChange={e => updateNode(c.id, 'testH', Number(e.target.value))} className="w-full bg-slate-50 rounded-xl p-3 text-xs font-bold text-center border-none" /></div>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                                <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2.5 text-xs font-bold appearance-none">{EUROPE_LIST.map(co => <option key={co} value={co}>{co}</option>)}</select>
-                                                <select value={c.res} onChange={e => updateNode(c.id, 'res', e.target.value)} className="w-full bg-slate-50 rounded-xl p-2.5 text-xs font-bold appearance-none"><option value="Internal">Internal IA</option><option value="External">External Partner</option></select>
-                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-wider ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>{c.status === 'Local' ? 'Standardize' : '✓ In Hub'}</button>
-                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`p-2 rounded-xl text-[10px] font-bold uppercase tracking-wider ${c.nature === 'Automated' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-indigo-600 text-white'}`}>{c.nature === 'Manual' ? 'Automate' : '✓ Automated'}</button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        </div>
                     </main>
                 </div>
             );
