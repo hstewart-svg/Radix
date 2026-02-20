@@ -15,10 +15,10 @@
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
         .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.3s ease; }
         .progress-bar { transition: width 1s ease-in-out; height: 100%; border-radius: 99px; }
-        .q-column { min-height: 450px; background: #f8fafc; border-radius: 24px; padding: 16px; border: 2px dashed #e2e8f0; }
-        .field-label { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 12px; font-weight: 600; border: 1px solid transparent; width: 100%; }
         .input-box:focus { outline: none; border-color: #6366f1; background: #fff; }
+        .field-label { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+        .q-column { min-height: 450px; background: #f8fafc; border-radius: 24px; padding: 16px; border: 2px dashed #e2e8f0; }
         .timeline-node { position: relative; padding-bottom: 24px; border-left: 2px solid #e2e8f0; margin-left: 10px; padding-left: 24px; }
         .timeline-node::before { content: ''; position: absolute; left: -7px; top: 0; width: 12px; height: 12px; background: #6366f1; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 2px #6366f1; }
     </style>
@@ -29,17 +29,10 @@
     <script type="text/babel">
         const { useState, useMemo } = React;
 
-        const GEOS = ["Poland", "Romania", "Czech Republic", "India", "Philippines", "Vietnam", "Germany", "Italy", "France", "United Kingdom", "Ireland", "USA"];
-        const QUARTERS = ["Q1", "Q2", "Q3", "Q4"];
+        const GEOS = ["Austria", "Belgium", "Czech Republic", "Denmark", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Luxembourg", "Netherlands", "Norway", "Poland", "Portugal", "Romania", "Spain", "Sweden", "Switzerland", "United Kingdom", "India", "Philippines", "Vietnam", "Singapore", "USA", "Mexico"];
         const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Event-Driven"];
-        const HUB_MAP = { 
-            "DACH": ["Germany", "Austria", "Switzerland"], 
-            "Nordics": ["Denmark", "Finland", "Norway", "Sweden"], 
-            "Southern": ["Italy", "Spain", "France"], 
-            "UK/IE": ["United Kingdom", "Ireland"],
-            "CEE": ["Poland", "Romania", "Czech Republic", "Hungary"],
-            "APAC": ["India", "Philippines", "Vietnam", "Singapore"]
-        };
+        const QUARTERS = ["Q1", "Q2", "Q3", "Q4"];
+        const HUB_MAP = { "DACH": ["Germany", "Austria", "Switzerland"], "Nordics": ["Denmark", "Finland", "Norway", "Sweden"], "Southern": ["Italy", "Spain", "France", "Portugal", "Greece"], "UK/IE": ["United Kingdom", "Ireland"], "CEE": ["Poland", "Romania", "Czech Republic", "Hungary"], "APAC": ["India", "Philippines", "Vietnam", "Singapore"] };
 
         const App = () => {
             const [view, setView] = useState('home');
@@ -48,16 +41,11 @@
             const [sscEurope, setSscEurope] = useState('Poland');
             const [sscAsia, setSscAsia] = useState('India');
             const [csvInput, setCsvInput] = useState("");
-            
-            const [levers, setLevers] = useState({ 
-                localRate: 115, euSscRate: 45, asiaSscRate: 22, 
-                internalAuditRate: 125, externalAuditRate: 245, 
-                autoTestTarget: 2, coeEfficiencyLift: 35 
-            });
+            const [levers, setLevers] = useState({ localRate: 115, euSscRate: 45, asiaSscRate: 22, internalAuditRate: 125, externalAuditRate: 245, autoTestTarget: 2, coeEfficiencyLift: 35 });
 
             const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "Procure to Pay", process: "Accounts Payable", subProcess: "Payments", controlName: "PMT-01", activity: "Standardized payment proposal review.", country: "Italy", execH: 1200, testH: 120, status: "Local", nature: "Manual", complexity: 1.0, res: "Internal", quarter: "Q1", frequency: "Weekly" },
-                { id: 2, cycle: "Record to Report", process: "General Ledger", subProcess: "Journal Entries", controlName: "GL-05", activity: "Manual JE validation steps.", country: "Germany", execH: 800, testH: 90, status: "Shared Service", nature: "Manual", complexity: 1.2, res: "External", quarter: "Q2", frequency: "Monthly" }
+                { id: 1, cycle: "Procure to Pay", process: "Accounts Payable", subProcess: "Payments", controlName: "PMT-01", activity: "Review bank transmission totals against weekly proposal.", country: "Italy", execH: 1200, testH: 120, status: "Local", nature: "Manual", complexity: 1.0, res: "Internal", quarter: "Q1", frequency: "Weekly" },
+                { id: 2, cycle: "Record to Report", process: "General Ledger", subProcess: "Journal Entries", controlName: "GL-05", activity: "Manual validation of non-standard recurring JEs.", country: "Germany", execH: 800, testH: 90, status: "Shared Service", nature: "Manual", complexity: 1.2, res: "External", quarter: "Q2", frequency: "Monthly" }
             ]);
 
             const analysis = useMemo(() => {
@@ -93,11 +81,7 @@
                     return { ...c, nodeDebt, pDebt, aDebt, nodeDiv };
                 });
 
-                return { 
-                    totalDebt, totalDiv, totalPerfDebt, totalAuditDebt, processed, qMap,
-                    hubs: Object.entries(hubData).map(([name, d]) => ({ name, debt: d.d, maturity: Math.round((d.s/d.n)*100), count: d.n })),
-                    functions: Object.entries(funcData).map(([name, d]) => ({ name, debt: d.d, maturity: Math.round((d.s/d.n)*100), nodes: d.n }))
-                };
+                return { totalDebt, totalDiv, totalPerfDebt, totalAuditDebt, processed, qMap, hubs: Object.entries(hubData).map(([name, d]) => ({ name, debt: d.d, maturity: Math.round((d.s/d.n)*100), count: d.n })), functions: Object.entries(funcData).map(([name, d]) => ({ name, debt: d.d, maturity: Math.round((d.s/d.n)*100), nodes: d.n })) };
             }, [rcmData, levers, funcMode]);
 
             const updateNode = (id, field, value) => setRcmData(rcmData.map(n => n.id === id ? { ...n, [field]: value } : n));
@@ -129,7 +113,7 @@
                         <div className="flex gap-2">
                             {['home', 'center', 'ingest', 'roadmap', 'config'].map(v => (
                                 <button key={v} onClick={() => setView(v)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
-                                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                                    {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
                         </div>
@@ -153,10 +137,10 @@
                                         {analysis.hubs.map(hub => (
                                             <div key={hub.name} className="card-ui p-8 space-y-6">
                                                 <div className="flex justify-between items-start">
-                                                    <div><h3 className="text-xl font-bold text-slate-800">{hub.name} Hub</h3><p className="text-[10px] font-bold text-slate-400 uppercase">{hub.count} Nodes</p></div>
+                                                    <div><h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight">{hub.name} Hub</h3><p className="text-[10px] font-bold text-slate-400 uppercase">{hub.count} Nodes</p></div>
                                                     <p className="text-2xl font-black text-indigo-600">{hub.maturity}%</p>
                                                 </div>
-                                                <div className="w-full bg-slate-50 h-3 rounded-full overflow-hidden"><div className="progress-bar bg-indigo-600" style={{ width: `${hub.maturity || 5}%` }}></div></div>
+                                                <div className="w-full bg-slate-50 h-2.5 rounded-full overflow-hidden border border-slate-100"><div className="progress-bar bg-indigo-600" style={{ width: `${hub.maturity || 5}%` }}></div></div>
                                                 <div className="pt-4 border-t border-slate-50 flex justify-between items-end">
                                                     <div><p className="text-[10px] font-bold text-slate-400 uppercase">Residual Friction</p><p className="text-xl font-bold text-rose-500 italic">${Math.round(hub.debt).toLocaleString()}</p></div>
                                                 </div>
@@ -178,15 +162,15 @@
 
                         {view === 'center' && (
                             <div className="space-y-12 animate-in fade-in">
-                                <h2 className="text-3xl font-bold text-slate-900">Dual-Hub Commander</h2>
+                                <h2 className="text-3xl font-bold text-slate-900">Dual-Hub Strategic Design</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-6">
-                                        <h3 className="text-lg font-bold">Digital Maturity Timeline</h3>
+                                        <h3 className="text-lg font-bold">Intelligent Transformation Timeline</h3>
                                         <div className="bg-white p-8 card-ui">
                                             {[
-                                                { stage: "Phase 1: Intelligent Intake", desc: "Centralize + RPA/AI Quick Wins. Standardize during migration.", icon: "⚡" },
+                                                { stage: "Phase 1: Intelligent Intake", desc: "Centralization with RPA/AI quick wins.", icon: "⚡" },
                                                 { stage: "Phase 2: Global Process Design", desc: "Aligning Hub DNA to single global standard.", icon: "📋" },
-                                                { stage: "Phase 3: Cognitive Excellence", desc: "AI-driven autonomous controls & testing.", icon: "🧠" }
+                                                { stage: "Phase 3: Cognitive Excellence", desc: "Autonomous AI-led execution & testing.", icon: "🧠" }
                                             ].map((item, i) => (
                                                 <div key={i} className="timeline-node">
                                                     <p className="font-extrabold text-slate-900 text-sm">{item.icon} {item.stage}</p>
@@ -195,11 +179,12 @@
                                             ))}
                                         </div>
                                     </div>
-                                    <div className="card-ui p-10 space-y-6">
-                                        <h3 className="text-lg font-bold">Labor Arbitrage Modeling</h3>
-                                        <div className="p-6 bg-slate-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Local Labor Baseline</p><p className="text-xl font-bold">${(levers.localRate * 1000).toLocaleString()}</p></div></div>
-                                        <div className="p-6 bg-indigo-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-indigo-400 uppercase">Europe Hub Savings</p><p className="text-xl font-bold text-indigo-600">${((levers.localRate - levers.euSscRate) * 1000).toLocaleString()}</p></div></div>
-                                        <div className="p-6 bg-emerald-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-emerald-500 uppercase">Asia Hub Savings</p><p className="text-xl font-bold text-emerald-600">${((levers.localRate - levers.asiaSscRate) * 1000).toLocaleString()}</p></div></div>
+                                    <div className="card-ui p-10 space-y-6 border-t-8 border-indigo-600">
+                                        <h3 className="text-lg font-bold">Regional Arbitrage Analysis</h3>
+                                        <p className="text-xs text-slate-400">Comparing 1,000 hour manual performance debt retirement.</p>
+                                        <div className="p-6 bg-slate-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-slate-400 uppercase">Local Baseline (EU)</p><p className="text-xl font-bold">${(levers.localRate * 1000).toLocaleString()}</p></div></div>
+                                        <div className="p-6 bg-indigo-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-indigo-400 uppercase">Europe Hub Impact</p><p className="text-xl font-bold text-indigo-600">${((levers.localRate - levers.euSscRate) * 1000).toLocaleString()}</p></div></div>
+                                        <div className="p-6 bg-emerald-50 rounded-2xl flex justify-between items-center"><div><p className="text-[10px] font-bold text-emerald-500 uppercase">Asia Hub Impact</p><p className="text-xl font-bold text-emerald-600">${((levers.localRate - levers.asiaSscRate) * 1000).toLocaleString()}</p></div></div>
                                     </div>
                                 </div>
                             </div>
@@ -208,8 +193,8 @@
                         {view === 'ingest' && (
                             <div className="space-y-12 animate-in slide-in-from-bottom-4">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-3xl font-bold text-slate-900">Process Architecture Workbench</h2>
-                                    <button onClick={() => setRcmData([{ id: Date.now(), cycle: "", process: "", subProcess: "", controlName: "NEW-CTRL", activity: "", country: "Germany", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "Internal", quarter: "Q1", frequency: "Monthly" }, ...rcmData])} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-xl">+ Add Node</button>
+                                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Process Architecture Workbench</h2>
+                                    <button onClick={() => setRcmData([{ id: Date.now(), cycle: "", process: "", subProcess: "", controlName: "NEW-CTRL", activity: "", country: "Poland", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "Internal", quarter: "Q1", frequency: "Monthly" }, ...rcmData])} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-sm font-bold shadow-xl shadow-indigo-100">+ Add node</button>
                                 </div>
                                 <div className="space-y-10">
                                     {analysis.processed.map(c => (
@@ -223,29 +208,49 @@
                                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                                                 <div className="lg:col-span-2 space-y-2"><label className="field-label">Control Activity Description</label><textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-32 leading-relaxed" /></div>
                                                 <div className="bg-slate-50/50 p-6 rounded-3xl space-y-4 border border-slate-100">
-                                                    <div><label className="field-label">C-Factor</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box text-center text-lg font-black" /></div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div><label className="field-label text-center">Exec (h)</label><input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="input-box text-center" /></div>
-                                                        <div><label className="field-label text-center">Test (h)</label><input type="number" value={c.testH} onChange={e => updateNode(c.id, 'testH', Number(e.target.value))} className="input-box text-center" /></div>
-                                                    </div>
+                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-bold text-slate-400 uppercase">Performance Debt</span><span className="text-sm font-bold text-slate-900">${Math.round(c.pDebt).toLocaleString()}</span></div>
+                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-bold text-indigo-400 uppercase">Compliance Debt</span><span className="text-sm font-bold text-indigo-600">${Math.round(c.aDebt).toLocaleString()}</span></div>
+                                                    <div className="pt-3 border-t border-slate-200 flex justify-between items-center"><span className="text-[10px] font-bold text-emerald-500 uppercase">Dividend Capture</span><span className="text-lg font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</span></div>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-wrap justify-between items-center gap-6 pt-6 border-t border-slate-50">
-                                                <div className="flex gap-4">
-                                                    <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box w-48 text-indigo-600 font-bold">{GEOS.map(co => <option key={co} value={co}>{co}</option>)}</select>
-                                                    <select value={c.res} onChange={e => updateNode(c.id, 'res', e.target.value)} className="input-box w-40"><option value="Internal">Internal IA</option><option value="External">Ext. Partner</option></select>
-                                                    <select value={c.quarter} onChange={e => updateNode(c.id, 'quarter', e.target.value)} className="input-box w-32">{QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}</select>
+                                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+                                                <div className="lg:col-span-1">
+                                                    <label className="field-label">Entity</label>
+                                                    <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box text-indigo-600 font-bold">{GEOS.map(co => <option key={co} value={co}>{co}</option>)}</select>
                                                 </div>
+                                                <div>
+                                                    <label className="field-label">Control Frequency</label>
+                                                    <select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}</select>
+                                                </div>
+                                                <div>
+                                                    <label className="field-label">Testing pool</label>
+                                                    <select value={c.res} onChange={e => updateNode(c.id, 'res', e.target.value)} className="input-box"><option value="Internal">Internal IA</option><option value="External">External</option></select>
+                                                </div>
+                                                <div>
+                                                    <label className="field-label">Exec (h)</label>
+                                                    <input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="input-box text-center" />
+                                                </div>
+                                                <div>
+                                                    <label className="field-label">Test (h)</label>
+                                                    <input type="number" value={c.testH} onChange={e => updateNode(c.id, 'testH', Number(e.target.value))} className="input-box text-center" />
+                                                </div>
+                                                <div>
+                                                    <label className="field-label">Complexity (C-Factor)</label>
+                                                    <input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box text-center" />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                                 <div className="flex gap-3">
-                                                    <button onClick={() => cloneNode(c)} className="px-6 py-3 rounded-xl text-[11px] font-bold uppercase bg-slate-100 text-slate-600">Clone DNA</button>
-                                                    <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`px-6 py-3 rounded-xl text-[11px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Local' ? 'Standardize' : '✓ Standardized'}</button>
-                                                    <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`px-6 py-3 rounded-xl text-[11px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'}`}>{c.nature === 'Manual' ? 'Automate' : '✓ Automated'}</button>
+                                                    <button onClick={() => cloneNode(c)} className="px-5 py-2 rounded-xl text-[10px] font-bold uppercase bg-slate-100 text-slate-600">Clone DNA</button>
+                                                    <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`px-5 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Local' ? 'Standardize to Hub' : '✓ Standardized'}</button>
+                                                    <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`px-5 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'}`}>{c.nature === 'Manual' ? 'Automate control' : '✓ Automated'}</button>
                                                 </div>
+                                                <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-extrabold text-rose-300 uppercase hover:text-rose-500">Remove</button>
                                             </div>
                                         </div>
                                     ))}
                                     <div className="bg-slate-950 p-10 rounded-[2rem] text-white shadow-2xl">
-                                        <h3 className="text-xl font-bold mb-4 uppercase">Bulk Ingest</h3>
+                                        <h3 className="text-xl font-bold mb-4 uppercase">Bulk RCM Osmosis</h3>
                                         <textarea value={csvInput} onChange={e => setCsvInput(e.target.value)} placeholder="Cycle, Process, Name, Activity, Country, ExecH, TestH, Comp, Wave, Nature, Res, Frequency" className="w-full h-32 bg-slate-900 rounded-[20px] p-6 text-xs font-mono text-indigo-300 focus:outline-none" />
                                         <button onClick={handleCsv} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-bold uppercase text-xs mt-8">Execute bulk ingest</button>
                                     </div>
@@ -255,13 +260,13 @@
 
                         {view === 'roadmap' && (
                             <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                                <h2 className="text-3xl font-bold text-slate-900">Wave Migration Schedule</h2>
+                                <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Time-Phased ROI Waterfall</h2>
                                 <div className="grid grid-cols-4 gap-6">
                                     {QUARTERS.map(q => (
                                         <div key={q} className="space-y-4">
                                             <div className="flex justify-between px-2"><span className="text-sm font-black">{q} Launch</span><span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">${Math.round(analysis.qMap[q]).toLocaleString()}</span></div>
                                             <div className="q-column space-y-4">
-                                                {analysis.processed.filter(c => c.quarter === q).map(c => (
+                                                {analysis.processed.filter(c => (c.quarter || 'Q1') === q).map(c => (
                                                     <div key={c.id} className="card-ui p-4 border-l-4 border-indigo-400">
                                                         <p className="text-[11px] font-bold text-slate-800">{c.controlName}</p>
                                                         <p className="text-[9px] text-slate-400 mt-1 uppercase">{c.country}</p>
@@ -283,11 +288,8 @@
                                 <h2 className="text-2xl font-bold">Baseline economics (USD/hr)</h2>
                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
                                     {[ 
-                                        { l: 'Local labor', k: 'localRate' }, 
-                                        { l: 'Europe Hub Rate', k: 'euSscRate' }, 
-                                        { l: 'Asia Hub Rate', k: 'asiaSscRate' },
-                                        { l: 'Internal IA', k: 'internalAuditRate' }, 
-                                        { l: 'External partner', k: 'externalAuditRate' } 
+                                        { l: 'Local labor', k: 'localRate' }, { l: 'Europe Hub Rate', k: 'euSscRate' }, { l: 'Asia Hub Rate', k: 'asiaSscRate' },
+                                        { l: 'Internal IA', k: 'internalAuditRate' }, { l: 'External partner', k: 'externalAuditRate' } 
                                     ].map(i => (
                                         <div key={i.k} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{i.l}</label>
