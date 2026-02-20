@@ -13,7 +13,8 @@
         * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
         body { background: #fcfdfe; color: #0f172a; margin: 0; }
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
-        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 24px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.2s ease; }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 24px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
+        .waterfall-bar { transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); height: 12px; border-radius: 99px; }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
@@ -25,65 +26,49 @@
         const { useState, useMemo } = React;
 
         const EUROPE_LIST = ["Austria", "Belgium", "Denmark", "Finland", "France", "Germany", "Ireland", "Italy", "Luxembourg", "Netherlands", "Norway", "Spain", "Sweden", "Switzerland", "United Kingdom"];
-        
-        // REGIONAL HUB DEFINITIONS
-        const HUB_MAPPING = {
-            "DACH": ["Germany", "Austria", "Switzerland"],
-            "Nordics": ["Denmark", "Finland", "Norway", "Sweden"],
-            "Benelux": ["Belgium", "Netherlands", "Luxembourg"],
-            "Southern": ["Italy", "Spain", "France"],
-            "UK/IE": ["United Kingdom", "Ireland"]
-        };
-
         const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Event-Driven"];
 
         const App = () => {
             const [view, setView] = useState('home');
+            
             const [levers, setLevers] = useState({
                 localRate: 115, sharedServiceRate: 45, internalAuditRate: 125, externalAuditRate: 245,
                 autoTestTarget: 2, coeEfficiencyLift: 35
             });
 
             const [rcmData, setRcmData] = useState([
-                { id: 1, cycle: "P2P", process: "Accounts Payable", controlName: "PMT-01", activity: "Manager reviews payment proposal report and matches totals.", country: "Italy", execH: 140, testH: 60, status: "Local", nature: "Manual", complexity: 1.2, wave: 1, res: "Internal", frequency: "Weekly" },
-                { id: 2, cycle: "P2P", process: "Accounts Payable", controlName: "PMT-01", activity: "Manager reviews payment proposal report and matches totals.", country: "Germany", execH: 110, testH: 45, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "External", frequency: "Monthly" }
+                { id: 1, cycle: "P2P", process: "Accounts Payable", controlName: "PMT-01", activity: "Manager reviews the payment proposal report and matches totals to invoice register.", country: "Italy", execH: 140, testH: 60, status: "Local", nature: "Manual", complexity: 1.2, wave: 1, res: "Internal", frequency: "Weekly" },
+                { id: 2, cycle: "R2R", process: "General Ledger", controlName: "GL-05", activity: "Manual Journal Entry review for items exceeding the corporate threshold.", country: "Germany", execH: 110, testH: 45, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "External", frequency: "Monthly" }
             ]);
 
             const analysis = useMemo(() => {
-                const hubs = {};
-                Object.keys(HUB_MAPPING).forEach(h => hubs[h] = { debt: 0, dividend: 0, count: 0 });
-                hubs["Other"] = { debt: 0, dividend: 0, count: 0 };
-
-                let totalDebt = 0; let totalDiv = 0;
+                let totalPerfDebt = 0; let totalAuditDebt = 0;
+                let totalOpDiv = 0; let totalAuditDiv = 0;
 
                 rcmData.forEach(c => {
-                    const localCost = c.execH * levers.localRate;
+                    const auditRate = c.res === "Internal" ? levers.internalAuditRate : levers.externalAuditRate;
+                    const pDebt = c.execH * levers.localRate;
+                    const aDebt = c.testH * auditRate;
+                    
+                    totalPerfDebt += pDebt;
+                    totalAuditDebt += aDebt;
+
                     const netLift = levers.coeEfficiencyLift / c.complexity;
                     const sharedCost = (c.execH * (1 - (netLift/100))) * levers.sharedServiceRate;
                     
-                    const rate = c.res === "Internal" ? levers.internalAuditRate : levers.externalAuditRate;
-                    const auditDiv = c.nature === "Automated" ? ((c.testH - levers.autoTestTarget) * rate) : 0;
-                    const opDiv = c.status === "Shared Service" ? (localCost - sharedCost) : 0;
-                    
-                    const hubName = Object.keys(HUB_MAPPING).find(h => HUB_MAPPING[h].includes(c.country)) || "Other";
-                    
-                    hubs[hubName].debt += localCost;
-                    hubs[hubName].dividend += (opDiv + auditDiv);
-                    hubs[hubName].count += 1;
-
-                    totalDebt += localCost;
-                    totalDiv += (opDiv + auditDiv);
+                    if (c.status === "Shared Service") totalOpDiv += (pDebt - sharedCost);
+                    if (c.nature === "Automated") totalAuditDiv += ((c.testH - levers.autoTestTarget) * auditRate);
                 });
 
-                return { totalDebt, totalDiv, hubs: Object.entries(hubs).filter(h => h[1].count > 0).sort((a,b) => b[1].debt - a[1].debt) };
+                const totalDebt = totalPerfDebt + totalAuditDebt;
+                const perfPct = (totalPerfDebt / totalDebt) * 100;
+                const auditPct = (totalAuditDebt / totalDebt) * 100;
+
+                return { totalDebt, totalPerfDebt, totalAuditDebt, perfPct, auditPct, totalDiv: totalOpDiv + totalAuditDiv };
             }, [rcmData, levers]);
 
             const updateNode = (id, field, value) => {
                 setRcmData(rcmData.map(n => n.id === id ? { ...n, [field]: value } : n));
-            };
-
-            const cloneNode = (node) => {
-                setRcmData([{ ...node, id: Date.now(), country: "Austria" }, ...rcmData]);
             };
 
             const LogoMark = () => (
@@ -113,114 +98,133 @@
                         </div>
                     </nav>
 
-                    <main className="max-w-5xl mx-auto px-6 mt-12 space-y-16">
+                    <main className="max-w-5xl mx-auto px-6 mt-12 space-y-12">
                         {view === 'home' && (
-                            <div className="space-y-16 animate-in fade-in duration-500">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                                    <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white flex flex-col justify-between min-h-[180px]">
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold uppercase tracking-widest text-rose-400">Annual Fragmentation Debt (USD)</p>
-                                            <p className="text-[10px] text-slate-500 italic">Maintaining manual, decentralized local controls.</p>
+                            <div className="space-y-12 animate-in fade-in duration-500">
+                                {/* PRIMARY DEBT WATERFALL SECTION */}
+                                <div className="space-y-6">
+                                    <h2 className="text-2xl font-bold text-slate-900">Annual fragmentation debt waterfall</h2>
+                                    <div className="card-ui p-10 space-y-10">
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Enterprise Friction</p>
+                                                <p className="text-5xl font-extrabold text-slate-900">${Math.round(analysis.totalDebt).toLocaleString()}<span className="text-lg font-bold text-slate-300 ml-2">USD</span></p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Dividend Potential</p>
+                                                <p className="text-3xl font-bold text-emerald-600">${Math.round(analysis.totalDiv).toLocaleString()}</p>
+                                            </div>
                                         </div>
-                                        <p className="text-5xl font-bold">${Math.round(analysis.totalDebt).toLocaleString()}</p>
-                                    </div>
-                                    <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 flex flex-col justify-between min-h-[180px]">
-                                        <div className="space-y-1">
-                                            <p className="text-xs font-bold uppercase tracking-widest text-emerald-500">Transformation Dividend (USD)</p>
-                                            <p className="text-[10px] text-slate-400 italic">Standardization and automation value capture.</p>
-                                        </div>
-                                        <p className="text-5xl font-bold text-indigo-600">${Math.round(analysis.totalDiv).toLocaleString()}</p>
-                                    </div>
-                                </div>
 
-                                <div className="space-y-8">
-                                    <h2 className="text-2xl font-bold text-slate-900">Regional hub performance</h2>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {analysis.hubs.map(([name, data]) => (
-                                            <div key={name} className="card-ui p-8 flex flex-col justify-between min-h-[220px]">
-                                                <div>
-                                                    <span className="text-[10px] font-bold uppercase text-indigo-500 bg-indigo-50 px-3 py-1 rounded-full mb-4 inline-block">{name} Cluster</span>
-                                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">{data.count} Active Nodes</h3>
+                                        <div className="space-y-8">
+                                            {/* PERFORMANCE DEBT BAR */}
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
+                                                    <span className="text-slate-500">Stakeholder Performance (Internal Labor)</span>
+                                                    <span className="text-slate-900">${Math.round(analysis.totalPerfDebt).toLocaleString()}</span>
                                                 </div>
-                                                <div className="pt-6 border-t border-slate-50 space-y-4">
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Hub Debt</p>
-                                                        <p className="text-xl font-bold text-slate-800">${Math.round(data.debt).toLocaleString()}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-emerald-500 uppercase">Dividend Capture</p>
-                                                        <p className="text-xl font-bold text-emerald-600">${Math.round(data.dividend).toLocaleString()}</p>
-                                                    </div>
+                                                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                                                    <div className="waterfall-bar bg-slate-900" style={{ width: `${analysis.perfPct}%` }}></div>
                                                 </div>
                                             </div>
-                                        ))}
+
+                                            {/* AUDIT DEBT BAR */}
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between text-xs font-bold uppercase tracking-wider">
+                                                    <span className="text-indigo-400">IA & SOX Compliance Testing (Internal/External)</span>
+                                                    <span className="text-indigo-600">${Math.round(analysis.totalAuditDebt).toLocaleString()}</span>
+                                                </div>
+                                                <div className="w-full bg-indigo-50 rounded-full h-3 overflow-hidden">
+                                                    <div className="waterfall-bar bg-indigo-600" style={{ width: `${analysis.auditPct}%` }}></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
-                            <div className="space-y-12 animate-in slide-in-from-bottom-4">
+                            <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-500">
                                 <div className="flex justify-between items-center">
                                     <h2 className="text-2xl font-bold text-slate-900">Control architecture</h2>
-                                    <button onClick={() => setRcmData([{ id: Date.now(), cycle: "", process: "", controlName: "", activity: "", country: "Germany", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "Internal", frequency: "Monthly" }, ...rcmData])} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl">+ New control</button>
+                                    <button onClick={() => setRcmData([{ id: Date.now(), cycle: "", process: "", controlName: "", activity: "", country: "Germany", execH: 40, testH: 20, status: "Local", nature: "Manual", complexity: 1.0, wave: 1, res: "Internal", frequency: "Monthly" }, ...rcmData])} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl">+ Add control</button>
                                 </div>
 
-                                <div className="space-y-6">
-                                    {rcmData.map(c => (
-                                        <div key={c.id} className="card-ui p-8 space-y-6 border-l-8 border-indigo-100">
-                                            <div className="flex justify-between items-start border-b border-slate-50 pb-4">
-                                                <div className="space-y-1">
-                                                    <input placeholder="Control ID" value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-2xl font-bold w-full bg-transparent focus:outline-none" />
-                                                    <div className="flex gap-2 text-[10px] font-bold uppercase text-slate-400">
-                                                        <span>{c.cycle || 'No Cycle'}</span> • <span>{c.process || 'No Process'}</span>
+                                <div className="space-y-8">
+                                    {rcmData.map(c => {
+                                        const auditRate = c.res === "Internal" ? levers.internalAuditRate : levers.externalAuditRate;
+                                        const pDebt = c.execH * levers.localRate;
+                                        const aDebt = c.testH * auditRate;
+                                        return (
+                                            <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                    <div className="space-y-6">
+                                                        <input placeholder="Control ID" value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-2xl font-bold w-full bg-transparent border-b border-slate-100 pb-2 focus:outline-none focus:border-indigo-400" />
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Execution (h)</label>
+                                                                <input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="w-full bg-slate-50 rounded-xl p-3 text-xs font-bold text-center border-none" />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">IA Testing (h)</label>
+                                                                <input type="number" value={c.testH} onChange={e => updateNode(c.id, 'testH', Number(e.target.value))} className="w-full bg-slate-50 rounded-xl p-3 text-xs font-bold text-center border-none" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="bg-slate-50/70 rounded-3xl p-6 flex flex-col justify-center space-y-4">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Node Debt Breakdown (USD)</p>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] font-semibold text-slate-500 uppercase">Labor performance</span>
+                                                            <span className="text-sm font-bold text-slate-900">${Math.round(pDebt).toLocaleString()}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] font-semibold text-indigo-400 uppercase">Compliance testing</span>
+                                                            <span className="text-sm font-bold text-indigo-600">${Math.round(aDebt).toLocaleString()}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => cloneNode(c)} className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl hover:bg-indigo-100">Clone DNA</button>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Entity</label>
-                                                    <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="w-full bg-slate-50 border-none rounded-xl p-3 text-xs font-bold appearance-none">
-                                                        {EUROPE_LIST.map(co => <option key={co} value={co}>{co}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Complexity</label>
-                                                    <input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="w-full bg-slate-50 border-none rounded-xl p-3 text-xs font-bold text-center" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Execution (h)</label>
-                                                    <input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="w-full bg-slate-50 border-none rounded-xl p-3 text-xs font-bold text-center" />
+                                                <textarea placeholder="Manual control activity narrative..." value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="w-full bg-slate-50 p-6 rounded-[24px] text-[13px] text-slate-600 leading-relaxed border-none h-24 focus:ring-1 focus:ring-indigo-100" />
+
+                                                <div className="flex flex-col sm:flex-row justify-between items-end gap-6 pt-6 border-t border-slate-50">
+                                                    <div className="flex gap-4 w-full sm:w-auto">
+                                                        <div className="flex-1">
+                                                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Entity</label>
+                                                            <select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="w-full bg-slate-100 px-4 py-2 rounded-xl border-none text-[11px] font-bold appearance-none">
+                                                                {EUROPE_LIST.map(co => <option key={co} value={co}>{co}</option>)}
+                                                            </select>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <label className="text-[9px] font-bold text-slate-400 uppercase block mb-1">IA Pool</label>
+                                                            <select value={c.res} onChange={e => updateNode(c.id, 'res', e.target.value)} className="w-full bg-slate-100 px-4 py-2 rounded-xl border-none text-[11px] font-bold">
+                                                                <option value="Internal">Internal IA</option><option value="External">Ext. Partner</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-4 w-full sm:w-auto">
+                                                        <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase tracking-wider transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-900 text-white'}`}>
+                                                            {c.status === 'Local' ? 'Standardize to Hub' : '✓ In Hub'}
+                                                        </button>
+                                                        <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`flex-1 sm:flex-none px-6 py-3 rounded-2xl text-[11px] font-bold uppercase tracking-wider transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-indigo-600 text-white'}`}>
+                                                            {c.nature === 'Manual' ? 'Automate Control' : '✓ Automated'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
-
-                                            <textarea placeholder="Control narrative..." value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="w-full bg-slate-50 p-6 rounded-[24px] text-[13px] text-slate-600 leading-relaxed border-none h-24 focus:ring-1 focus:ring-indigo-100" />
-
-                                            <div className="flex flex-col sm:flex-row justify-between gap-6 pt-4">
-                                                <div className="flex gap-4">
-                                                    <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`px-6 py-3 rounded-2xl text-[11px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-900 text-white'}`}>
-                                                        {c.status === 'Local' ? 'Standardize to Hub' : '✓ In Hub'}
-                                                    </button>
-                                                    <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`px-6 py-3 rounded-2xl text-[11px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-indigo-600 text-white'}`}>
-                                                        {c.nature === 'Manual' ? 'Automate Control' : '✓ Automated'}
-                                                    </button>
-                                                </div>
-                                                <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-400 uppercase hover:text-rose-600">Remove Node</button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
 
                         {view === 'config' && (
-                            <div className="bg-white p-12 rounded-[3rem] border border-slate-200 card-shadow animate-in fade-in duration-500">
-                                <h2 className="text-2xl font-bold mb-10">Baseline economics (USD)</h2>
+                            <div className="bg-white p-12 rounded-[3rem] border border-slate-200 card-shadow animate-in fade-in duration-500 space-y-12">
+                                <h2 className="text-2xl font-bold">Baseline economics (USD/hr)</h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="bg-indigo-50 p-10 rounded-[32px] border border-indigo-100 flex flex-col justify-center">
-                                        <label className="text-[12px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 italic text-center">Standard Optimization Factor</label>
+                                        <label className="text-[12px] font-bold text-indigo-400 uppercase tracking-widest block mb-4 italic text-center">Efficiency lift target</label>
                                         <div className="flex items-center gap-8">
                                             <input type="range" min="0" max="100" value={levers.coeEfficiencyLift} onChange={e => setLevers({...levers, coeEfficiencyLift: Number(e.target.value)})} className="flex-1 accent-indigo-600" />
                                             <span className="text-4xl font-bold text-indigo-600">{levers.coeEfficiencyLift}%</span>
@@ -228,10 +232,10 @@
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         {[
-                                            { label: 'Local labor (hr)', key: 'localRate' },
-                                            { label: 'Shared service (hr)', key: 'sharedServiceRate' },
-                                            { label: 'Internal audit (hr)', key: 'internalAuditRate' },
-                                            { label: 'External partner (hr)', key: 'externalAuditRate' }
+                                            { label: 'Local labor', key: 'localRate' },
+                                            { label: 'Shared service', key: 'sharedServiceRate' },
+                                            { label: 'Internal IA', key: 'internalAuditRate' },
+                                            { label: 'External partner', key: 'externalAuditRate' }
                                         ].map(item => (
                                             <div key={item.key} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col justify-between min-h-[110px]">
                                                 <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{item.label}</label>
