@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | Global Master v53.0</title>
+    <title>Radix Shift | Integrity Master v54.0</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -30,9 +30,9 @@
         const QUARTERS = ["Q1", "Q2", "Q3", "Q4"];
         const APAC_GEOS = ["India", "Philippines", "Vietnam", "Singapore"];
         const EXTRACTION_METHODS = [
-            { id: "api", name: "API", friction: 1, burden: 500 },
-            { id: "flat", name: "Flat", friction: 3, burden: 1200 },
-            { id: "rpa", name: "RPA", friction: 5, burden: 3500 }
+            { id: "api", name: "API", friction: 1 },
+            { id: "flat", name: "Flat", friction: 3 },
+            { id: "rpa", name: "RPA", friction: 5 }
         ];
 
         const App = () => {
@@ -49,44 +49,53 @@
                     id: 1, cycle: "P2P", process: "AP", controlName: "PMT-01", country: "Italy", 
                     execH: 1200, sampleSize: 25, minPerSample: 45, status: "Local", nature: "Manual", 
                     complexity: 1.0, quarter: "Q1", itSystem: "NetSuite", method: "api",
-                    reports: [{id: 101, name: "Payment Journal", type: "Standard", complexity: "Low"}]
+                    reports: [{id: 101, name: "FX Adjustment Sheet", type: "Spreadsheet (EUC)", complexity: "High"}]
                 }
             ]);
 
             const analysis = useMemo(() => {
                 let totalDebt = 0; let totalDiv = 0; const qMap = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
-                
                 const processed = rcmData.map(c => {
                     const testH = (c.sampleSize * c.minPerSample) / 60;
                     const pDebt = (c.execH || 0) * levers.localRate;
                     const aDebt = testH * levers.internalRate;
                     const nodeDebt = pDebt + aDebt;
-
                     let sscRate = levers.euSscRate;
                     if (hubStrategy === 'dual' && APAC_GEOS.includes(c.country)) sscRate = levers.asiaSscRate;
-
                     const netLift = levers.coeEfficiencyLift / (c.complexity || 1);
                     const sharedCost = ((c.execH || 0) * (1 - (netLift/100))) * sscRate;
                     const nodeDiv = c.status === "Shared Service" ? (pDebt - sharedCost) : 0;
-
-                    totalDebt += nodeDebt; totalDiv += nodeDiv;
-                    qMap[c.quarter || "Q1"] += nodeDiv;
-
+                    totalDebt += nodeDebt; totalDiv += nodeDiv; qMap[c.quarter || "Q1"] += nodeDiv;
                     return { ...c, nodeDebt, nodeDiv, testH };
                 });
-
                 return { totalDebt, totalDiv, processed, qMap };
             }, [rcmData, levers, hubStrategy]);
 
-            const updateNode = (id, field, value) => setRcmData(rcmData.map(n => n.id === id ? { ...n, [field]: value } : n));
+            // VERIFIED ACTION HANDLERS
+            const addControl = () => {
+                const newNode = {
+                    id: Date.now(), cycle: "New Cycle", process: "New Process", controlName: `CTRL-${rcmData.length + 1}`,
+                    country: "Poland", execH: 100, sampleSize: 25, minPerSample: 30, status: "Local", nature: "Manual",
+                    complexity: 1.0, quarter: "Q1", itSystem: "Standard ERP", method: "api", reports: []
+                };
+                setRcmData([newNode, ...rcmData]);
+            };
+
+            const updateNode = (id, field, value) => {
+                setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
+            };
+
+            const addReport = (nodeId) => {
+                setRcmData(prev => prev.map(n => n.id === nodeId ? { ...n, reports: [...(n.reports || []), {id: Date.now(), name: "New IPE", type: "Standard", complexity: "Low"}] } : n));
+            };
 
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Global Master v53.0</span></div>
+                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Integrity Master v54.0</span></div>
                         <div className="flex gap-2">
                             {['home', 'center', 'ingest', 'roadmap', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <button key={v} onClick={() => setView(v)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
@@ -96,16 +105,16 @@
                     <main className="max-w-6xl mx-auto px-6 mt-12 space-y-12">
                         {view === 'home' && (
                             <div className="space-y-12 animate-in fade-in">
-                                <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center">
-                                    <div><p className="text-xs font-bold uppercase text-rose-400">Fragmentation Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
+                                <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center shadow-2xl">
+                                    <div><p className="text-xs font-bold uppercase text-rose-400 mb-1">Total Fragmentation Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
                                     <div className="text-right">
-                                        <p className="text-xs font-bold uppercase text-emerald-400">Transformation Dividend</p>
+                                        <p className="text-xs font-bold uppercase text-emerald-400 mb-1">Standardization Dividend</p>
                                         <p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p>
                                     </div>
                                 </div>
-                                <div className="bg-slate-100 p-2 rounded-2xl flex gap-1 w-fit mx-auto">
-                                    <button onClick={() => setHubStrategy('single')} className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${hubStrategy === 'single' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>Pilot (Single Hub)</button>
-                                    <button onClick={() => setHubStrategy('dual')} className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${hubStrategy === 'dual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>Global (Dual Hub)</button>
+                                <div className="flex justify-center gap-4">
+                                    <button onClick={() => setHubStrategy('single')} className={`px-8 py-3 rounded-2xl text-xs font-bold transition-all border ${hubStrategy === 'single' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}>Pilot Hub (Single)</button>
+                                    <button onClick={() => setHubStrategy('dual')} className={`px-8 py-3 rounded-2xl text-xs font-bold transition-all border ${hubStrategy === 'dual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}>Global Hub (Dual)</button>
                                 </div>
                             </div>
                         )}
@@ -113,57 +122,39 @@
                         {view === 'center' && (
                             <div className="grid grid-cols-2 gap-8 animate-in fade-in">
                                 <div className="card-ui p-10 border-l-8 border-indigo-500">
-                                    <p className="field-label">Primary Hub Rate</p>
-                                    <p className="text-4xl font-black text-indigo-600">${levers.euSscRate}/hr</p>
+                                    <p className="field-label">EMEA Hub Rate (Primary)</p>
+                                    <p className="text-4xl font-black text-indigo-600">${levers.euSscRate}<span className="text-sm font-bold text-slate-300">/hr</span></p>
                                 </div>
-                                <div className={`card-ui p-10 border-l-8 border-emerald-500 ${hubStrategy === 'single' ? 'opacity-20 grayscale' : ''}`}>
-                                    <p className="field-label">Asia Hub Rate</p>
-                                    <p className="text-4xl font-black text-emerald-600">${levers.asiaSscRate}/hr</p>
+                                <div className={`card-ui p-10 border-l-8 border-emerald-500 transition-opacity ${hubStrategy === 'single' ? 'opacity-20' : 'opacity-100'}`}>
+                                    <p className="field-label">APAC Hub Rate (Secondary)</p>
+                                    <p className="text-4xl font-black text-emerald-600">${levers.asiaSscRate}<span className="text-sm font-bold text-slate-300">/hr</span></p>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
                             <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                                <h2 className="text-2xl font-black text-slate-900">Control DNA & Inventory</h2>
+                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black">Control DNA Architect</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700">+ Add New Control</button></div>
                                 {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100">
+                                    <div key={c.id} className="card-ui p-8 space-y-10 border-l-8 border-indigo-100">
                                         <div className="grid grid-cols-4 gap-6">
                                             <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold" /></div>
                                             <div><label className="field-label">IT System</label><input value={c.itSystem} onChange={e => updateNode(c.id, 'itSystem', e.target.value)} className="input-box" /></div>
-                                            <div><label className="field-label">Quarter</label><select value={c.quarter} onChange={e => updateNode(c.id, 'quarter', e.target.value)} className="input-box">{QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}</select></div>
-                                            <div className="text-right">
-                                                <p className="field-label">Current Debt</p>
-                                                <p className="text-lg font-black text-rose-500">${Math.round(c.nodeDebt).toLocaleString()}</p>
-                                            </div>
+                                            <div><label className="field-label">Geography</label><select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box font-bold text-indigo-600">{GEOS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
+                                            <div className="text-right"><p className="field-label">Node Dividend</p><p className="text-lg font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-6 pt-4 border-t border-slate-50">
-                                            <div><label className="field-label">Samples</label><input type="number" value={c.sampleSize} onChange={e => updateNode(c.id, 'sampleSize', Number(e.target.value))} className="input-box" /></div>
+                                        <div className="grid grid-cols-3 gap-8 pt-6 border-t border-slate-50">
+                                            <div><label className="field-label">Sample Size</label><input type="number" value={c.sampleSize} onChange={e => updateNode(c.id, 'sampleSize', Number(e.target.value))} className="input-box" /></div>
                                             <div><label className="field-label">Complexity (C-Factor)</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box" /></div>
-                                            <div>
-                                                <label className="field-label">Digital Friction</label>
-                                                <div className="flex bg-slate-100 p-1 rounded-lg">
-                                                    {EXTRACTION_METHODS.map(m => (
-                                                        <button key={m.id} onClick={() => updateNode(c.id, 'method', m.id)} className={`flex-1 text-[9px] font-black py-1 rounded ${c.method === m.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{m.name}</button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                            <div><label className="field-label">Digital Friction</label><div className="flex bg-slate-100 p-1 rounded-xl">{EXTRACTION_METHODS.map(m => (<button key={m.id} onClick={() => updateNode(c.id, 'method', m.id)} className={`flex-1 text-[9px] font-black py-1.5 rounded-lg ${c.method === m.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{m.name}</button>))}</div></div>
                                         </div>
-                                        <div className="bg-slate-50 p-6 rounded-2xl">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h4 className="text-[10px] font-black uppercase text-slate-400">Key Reports & EUC</h4>
-                                                <button onClick={() => updateNode(c.id, 'reports', [...(c.reports || []), {id: Date.now(), name: "New Report", type: "Standard", complexity: "Low"}])} className="text-[10px] font-bold text-indigo-600 underline">+ Add IPE</button>
-                                            </div>
-                                            {(c.reports || []).map(r => (
-                                                <div key={r.id} className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center mb-2">
-                                                    <span className="text-xs font-bold text-slate-700">{r.name}</span>
-                                                    <span className="text-[9px] text-slate-400 uppercase font-black">{r.type}</span>
-                                                </div>
-                                            ))}
+                                        <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                                            <div className="flex justify-between items-center mb-4"><h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">IPE & EUC Inventory</h4><button onClick={() => addReport(c.id)} className="text-[10px] font-bold text-indigo-600 underline">+ Add Report</button></div>
+                                            <div className="space-y-3">{(c.reports || []).map(r => (<div key={r.id} className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm"><span className="text-xs font-bold text-slate-700">{r.name}</span><span className="text-[9px] font-black text-indigo-300 uppercase">{r.type}</span></div>))}</div>
                                         </div>
-                                        <div className="flex gap-4">
-                                            <button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Local' ? 'Standardize' : '✓ Standardized'}</button>
-                                            <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`px-6 py-2 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'}`}>{c.nature === 'Manual' ? 'Automate' : '✓ Automated'}</button>
+                                        <div className="flex justify-between items-center pt-6 border-t border-slate-50">
+                                            <div className="flex gap-4"><button onClick={() => updateNode(c.id, 'status', c.status === 'Local' ? 'Shared Service' : 'Local')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Local' ? 'Move to Hub' : '✓ Standardized'}</button><button onClick={() => updateNode(c.id, 'nature', c.nature === 'Manual' ? 'Automated' : 'Manual')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'}`}>{c.nature === 'Manual' ? 'Automate' : '✓ Automated'}</button></div>
+                                            <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Remove Node</button>
                                         </div>
                                     </div>
                                 ))}
@@ -174,13 +165,14 @@
                             <div className="grid grid-cols-4 gap-6 animate-in fade-in">
                                 {QUARTERS.map(q => (
                                     <div key={q} className="q-column">
-                                        <p className="text-sm font-black mb-4">{q} Deployment</p>
+                                        <p className="text-sm font-black mb-6 border-b border-slate-200 pb-2">{q} Launch</p>
                                         {analysis.processed.filter(c => c.quarter === q).map(c => (
-                                            <div key={c.id} className="card-ui p-4 mb-4 border-l-4 border-indigo-500">
-                                                <p className="text-xs font-bold text-slate-700">{c.controlName}</p>
-                                                <div className="flex justify-between mt-4">
-                                                    <button onClick={() => updateNode(c.id, 'quarter', QUARTERS[QUARTERS.indexOf(q)-1])} disabled={q==='Q1'} className="text-[10px] text-slate-300">←</button>
-                                                    <button onClick={() => updateNode(c.id, 'quarter', QUARTERS[QUARTERS.indexOf(q)+1])} disabled={q==='Q4'} className="text-[10px] text-slate-300">→</button>
+                                            <div key={c.id} className="card-ui p-5 mb-4 border-l-4 border-indigo-500 group">
+                                                <p className="text-xs font-bold text-slate-800">{c.controlName}</p>
+                                                <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold">{c.country}</p>
+                                                <div className="flex justify-between mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => updateNode(c.id, 'quarter', QUARTERS[QUARTERS.indexOf(q)-1])} disabled={q==='Q1'} className="text-xs hover:text-indigo-600 disabled:opacity-0">←</button>
+                                                    <button onClick={() => updateNode(c.id, 'quarter', QUARTERS[QUARTERS.indexOf(q)+1])} disabled={q==='Q4'} className="text-xs hover:text-indigo-600 disabled:opacity-0">→</button>
                                                 </div>
                                             </div>
                                         ))}
@@ -192,9 +184,9 @@
                         {view === 'config' && (
                             <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-8 animate-in fade-in">
                                 {Object.entries(levers).map(([k, v]) => (
-                                    <div key={k} className="bg-slate-50 p-6 rounded-2xl">
-                                        <label className="field-label">{k}</label>
-                                        <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-2xl font-black bg-transparent outline-none w-full" />
+                                    <div key={k} className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                        <label className="field-label">{k.replace(/([A-Z])/g, ' $1')}</label>
+                                        <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-2xl font-black bg-transparent outline-none w-full text-indigo-600" />
                                     </div>
                                 ))}
                             </div>
