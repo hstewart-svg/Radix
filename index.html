@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | v58.0 Hardened RCM</title>
+    <title>Radix Shift | v59.0 DNA Replicator</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,11 +13,12 @@
         * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
         body { background: #fcfdfe; color: #0f172a; margin: 0; padding: 0; }
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
-        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.2s ease; }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; }
         .input-box:focus { border-color: #6366f1; background: #fff; outline: none; }
         .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
         .badge-pill { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; }
+        .logic-box { background: #f0f9ff; border: 1px solid #e0f2fe; padding: 16px; border-radius: 16px; font-size: 11px; line-height: 1.5; color: #0369a1; }
     </style>
 </head>
 <body>
@@ -44,13 +45,13 @@
             const [rcmData, setRcmData] = useState([
                 { 
                     id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", 
-                    activity: "Manager reviews bank transmission totals against weekly proposal.",
+                    activity: "Manager reviews bank transmission totals against proposal.",
                     objective: "Ensure accurate and authorized payment processing.",
-                    risk: "Risk of unauthorized fund transfers or duplicate payments.",
+                    risk: "Unauthorized fund transfers or duplicate payments.",
                     itSystem: "NetSuite", country: "Italy", category: "Business Process (BP)", 
                     nature: "Manual", frequency: "Weekly", priority: "High", 
                     isKey: true, isFraud: true, complexity: 1.0, 
-                    execH: 1200, sampleSize: 25, minPerSample: 45, quarter: "Q1", status: "Local"
+                    execH: 1200, sampleSize: 25, minPerSample: 45, quarter: "Q1", status: "Local", reports: []
                 }
             ]);
 
@@ -61,11 +62,9 @@
                     const pDebt = (c.execH || 0) * levers.localRate;
                     const aDebt = testH * levers.internalRate;
                     const nodeDebt = pDebt + aDebt;
-                    
                     let sscRate = (hubStrategy === 'dual' && ["India", "Philippines"].includes(c.country)) ? levers.asiaSscRate : levers.euSscRate;
                     const netLift = (levers.coeEfficiencyLift || 35) / (c.complexity || 1);
                     const sharedCost = ((c.execH || 0) * (1 - (netLift/100))) * sscRate;
-                    
                     const nodeDiv = c.status === "Shared Service" ? (pDebt - sharedCost) : 0;
                     totalDebt += nodeDebt; totalDiv += nodeDiv;
                     return { ...c, nodeDebt, nodeDiv };
@@ -82,66 +81,67 @@
                     id: Date.now(), controlName: "NEW-CTRL", cycle: "Cycle", activity: "", 
                     nature: "Manual", frequency: "Monthly", category: "Business Process (BP)",
                     complexity: 1.0, country: "Poland", isKey: false, isFraud: false, 
-                    priority: "Medium", status: "Local", execH: 100, sampleSize: 25, minPerSample: 30, quarter: "Q1"
+                    priority: "Medium", status: "Local", execH: 100, sampleSize: 25, minPerSample: 30, quarter: "Q1", reports: []
                 };
                 setRcmData([newNode, ...rcmData]);
+            };
+
+            // VERIFIED CLONE LOGIC
+            const cloneControl = (item) => {
+                const clonedNode = { 
+                    ...item, 
+                    id: Date.now(), 
+                    controlName: item.controlName + " (Copy)",
+                    reports: item.reports ? [...item.reports] : [] 
+                };
+                setRcmData([clonedNode, ...rcmData]);
             };
 
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col">
-                            <span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span>
-                            <span className="text-[10px] font-bold text-indigo-500 uppercase mt-1">Unified RCM v58.0</span>
-                        </div>
+                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 uppercase mt-1">Global DNA Replicator v59.0</span></div>
                         <div className="flex gap-2">
                             {['home', 'ingest', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-6xl mx-auto px-6 mt-12 space-y-12">
+                    <main className="max-w-6xl mx-auto px-6 mt-12 space-y-10">
                         {view === 'home' && (
                             <div className="space-y-12 animate-in fade-in">
-                                <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center">
-                                    <div><p className="text-xs font-bold uppercase text-rose-400 mb-1">Total Fragmentation Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
-                                    <div className="text-right">
-                                        <p className="text-xs font-bold uppercase text-emerald-400 mb-1">Standardization Dividend</p>
-                                        <p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p>
-                                    </div>
+                                <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center shadow-xl">
+                                    <div><p className="text-xs font-bold uppercase text-rose-400 mb-1 tracking-widest">Fragmentation Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
+                                    <div className="text-right"><p className="text-xs font-bold uppercase text-emerald-400 mb-1 tracking-widest">Dividend Potential</p><p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p></div>
                                 </div>
                                 <div className="flex justify-center gap-4">
-                                    <button onClick={() => setHubStrategy('single')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'single' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400'}`}>Pilot (Single Hub)</button>
-                                    <button onClick={() => setHubStrategy('dual')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'dual' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400'}`}>Global (Dual Hub)</button>
+                                    <button onClick={() => setHubStrategy('single')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'single' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>Pilot Hub (Single)</button>
+                                    <button onClick={() => setHubStrategy('dual')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'dual' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>Global Hub (Dual)</button>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
                             <div className="space-y-10 animate-in slide-in-from-bottom-4">
-                                <div className="flex justify-between items-center">
-                                    <h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2>
-                                    <button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100">+ Add New Control</button>
-                                </div>
+                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100">+ Add New Control</button></div>
 
-                                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl flex gap-4 items-start shadow-sm">
+                                <div className="logic-box flex gap-4 items-start shadow-sm">
                                     <span className="text-2xl">💡</span>
                                     <div className="text-xs leading-relaxed">
-                                        <p className="font-bold text-indigo-900 mb-1 tracking-tight uppercase">Complexity (C-Factor) Guidance</p>
-                                        <p className="text-indigo-700 font-medium">Baseline is <b>1.0</b>. Add <b>+0.2</b> for local language data, <b>+0.3</b> for manual estimates/judgment, and <b>+0.5</b> for high system fragmentation. High complexity directly reduces Hub efficiency gains.</p>
+                                        <p className="font-bold text-indigo-900 mb-1 uppercase tracking-tight">Complexity (C-Factor) Guidance</p>
+                                        <p className="text-indigo-700">Baseline is <b>1.0</b>. Add <b>+0.2</b> for local language, <b>+0.3</b> for judgment-heavy tasks, and <b>+0.5</b> for legacy fragmentation. Use the <b>Clone DNA</b> button to replicate these settings across similar processes.</p>
                                     </div>
                                 </div>
 
                                 {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100 group">
-                                        {/* HEADER BAR */}
+                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100 relative group">
                                         <div className="flex justify-between items-center pb-6 border-b border-slate-50">
                                             <div className="flex items-center gap-4">
-                                                <input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-2xl font-black text-slate-900 bg-transparent outline-none w-48" />
-                                                {c.isKey && <span className="badge-pill bg-rose-100 text-rose-700">Key Control</span>}
+                                                <input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="text-2xl font-black text-slate-900 bg-transparent outline-none w-64 border-b border-transparent hover:border-slate-200" />
+                                                {c.isKey && <span className="badge-pill bg-rose-100 text-rose-700">Key</span>}
                                                 {c.isFraud && <span className="badge-pill bg-amber-100 text-amber-700">Fraud Control</span>}
                                             </div>
                                             <div className="flex gap-4">
@@ -150,7 +150,6 @@
                                             </div>
                                         </div>
 
-                                        {/* TAXONOMY GRID */}
                                         <div className="grid grid-cols-4 gap-6">
                                             <div><label className="field-label">Cycle / BU</label><input value={c.cycle} onChange={e => updateNode(c.id, 'cycle', e.target.value)} className="input-box" /></div>
                                             <div><label className="field-label">Category</label><select value={c.category} onChange={e => updateNode(c.id, 'category', e.target.value)} className="input-box">{CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
@@ -158,14 +157,11 @@
                                             <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
                                         </div>
 
-                                        {/* NARRATIVE SECTION */}
                                         <div className="grid grid-cols-2 gap-8">
-                                            <div><label className="field-label">Control Objective</label><textarea value={c.objective} onChange={e => updateNode(c.id, 'objective', e.target.value)} className="input-box h-20 text-left font-normal" placeholder="The objective of this control is..." /></div>
-                                            <div><label className="field-label">Risk Mitigated</label><textarea value={c.risk} onChange={e => updateNode(c.id, 'risk', e.target.value)} className="input-box h-20 text-left font-normal" placeholder="This control mitigates the risk of..." /></div>
+                                            <div><label className="field-label">Control Objective</label><textarea value={c.objective} onChange={e => updateNode(c.id, 'objective', e.target.value)} className="input-box h-20 text-left font-normal" /></div>
+                                            <div><label className="field-label">Risk Mitigated</label><textarea value={c.risk} onChange={e => updateNode(c.id, 'risk', e.target.value)} className="input-box h-20 text-left font-normal" /></div>
                                         </div>
-                                        <div><label className="field-label">Activity Narrative</label><textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-24 text-left font-normal" placeholder="Describe the control procedure here..." /></div>
 
-                                        {/* STATS & PRIORITY */}
                                         <div className="grid grid-cols-4 gap-6">
                                             <div><label className="field-label">IT System</label><input value={c.itSystem} onChange={e => updateNode(c.id, 'itSystem', e.target.value)} className="input-box" /></div>
                                             <div><label className="field-label">Priority</label><select value={c.priority} onChange={e => updateNode(c.id, 'priority', e.target.value)} className="input-box">{PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -173,18 +169,18 @@
                                             <div><label className="field-label">Geo</label><select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box">{GEOS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
                                         </div>
 
-                                        {/* ACTION BAR */}
                                         <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                             <div className="flex gap-4">
                                                 <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ Standardized' : 'Move to Hub'}</button>
+                                                <button onClick={() => cloneControl(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all">Clone DNA</button>
                                             </div>
-                                            <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Delete Record</button>
+                                            <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Delete</button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-
+                        
                         {view === 'config' && (
                             <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-8 animate-in fade-in">
                                 {Object.entries(levers).map(([k, v]) => (
