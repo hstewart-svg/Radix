@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | v73.0 Capital Reporting</title>
+    <title>Radix Shift | v74.0 Economic Guardrail</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,11 +13,9 @@
         * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
         body { background: #fcfdfe; color: #0f172a; margin: 0; padding: 0; }
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
-        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.2s ease; }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; }
         .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
-        .logic-panel { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 24px; padding: 24px; }
-        .glossary-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px; border-left: 4px solid #4f46e5; }
     </style>
 </head>
 <body>
@@ -33,7 +31,6 @@
             const [view, setView] = useState('home');
             const [hubStrategy, setHubStrategy] = useState('single');
             const [scenario, setScenario] = useState('base');
-            
             const [levers, setLevers] = useState({ 
                 localRate: 115, euSscRate: 45, asiaSscRate: 22, internalRate: 125,
                 autoTestTarget: 2, fteWorkingHours: 1800, implCostPerControl: 4500, coeEfficiencyLift: 35
@@ -41,12 +38,10 @@
 
             const [rcmData, setRcmData] = useState([
                 { 
-                    id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", subProcess: "Payments",
-                    activity: "Manager reviews bank transmission totals against proposal.",
-                    objective: "Accuracy of payments.", risk: "Unauthorized payments.",
-                    itSystem: "NetSuite", country: "Italy", status: "Local", nature: "Manual",
+                    id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable",
+                    country: "Italy", status: "Local", nature: "Manual",
                     frequency: "Weekly", hoursPerPerformance: 2, iaTodH: 8, iaToeH: 32,
-                    complexity: 1.0, quarter: "Q1", reports: []
+                    complexity: 1.0, quarter: "Q1"
                 }
             ]);
 
@@ -61,9 +56,8 @@
                     const iaH = (c.iaTodH || 0) + (c.iaToeH || 0);
                     const debt = (opH * levers.localRate) + (iaH * levers.internalRate);
                     
-                    let sscRate = (hubStrategy === 'dual' && ["India", "Philippines"].includes(c.country)) ? levers.asiaSscRate : levers.euSscRate;
-                    const netLift = levers.coeEfficiencyLift / (c.complexity || 1);
-                    const sharedCost = (opH * (1 - (netLift/100))) * sscRate;
+                    let sscRate = (hubStrategy === 'dual' && ["India"].includes(c.country)) ? levers.asiaSscRate : levers.euSscRate;
+                    const sharedCost = (opH * (1 - (levers.coeEfficiencyLift/100))) * sscRate;
                     
                     const opDiv = c.status === "Shared Service" ? ((opH * levers.localRate) - sharedCost) : 0;
                     const auditDiv = c.nature === "Automated" ? ((iaH - levers.autoTestTarget) * levers.internalRate) : 0;
@@ -73,25 +67,25 @@
                     }
 
                     totalDebt += debt; totalDiv += (opDiv + auditDiv);
-                    return { ...c, debt, nodeDiv: opDiv + auditDiv, opH, iaH };
+                    return { ...c, nodeDiv: opDiv + auditDiv };
                 });
                 
                 const implCost = rcmData.length * levers.implCostPerControl;
-                const paybackMonths = (implCost / (totalDiv || 1)) * 12;
+                let paybackText = "N/A (Pending Selection)";
+                if (totalDiv > 0) {
+                    const months = (implCost / totalDiv) * 12;
+                    paybackText = months > 12 ? (months / 12).toFixed(1) + ' Years' : months.toFixed(1) + ' Months';
+                }
                 
-                return { totalDebt, totalDiv, totalCapReclaimed, processed, implCost, paybackMonths };
+                return { totalDebt, totalDiv, totalCapReclaimed, processed, implCost, paybackText };
             }, [rcmData, levers, hubStrategy, scenario]);
 
             const updateNode = (id, field, value) => setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
-            const cloneNode = (item) => setRcmData([{ ...item, id: Date.now(), controlName: item.controlName + " (Copy)" }, ...rcmData]);
 
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col">
-                            <span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span>
-                            <span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Integrated ROI Architect v73.0</span>
-                        </div>
+                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Economic Guardrail v74.0</span></div>
                         <div className="flex gap-2">
                             {['home', 'ingest', 'config'].map(v => (
                                 <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -113,24 +107,16 @@
                                         <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Capacity Reclaimed</p>
                                         <p className="text-4xl font-black text-slate-900">{Math.round(analysis.totalCapReclaimed / levers.fteWorkingHours)} FTE</p>
                                     </div>
-                                    <div className="p-8 bg-slate-100 border border-slate-200 rounded-[2.5rem] text-center shadow-inner">
+                                    <div className="p-8 bg-slate-100 border border-slate-200 rounded-[2.5rem] text-center">
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Capital Payback</p>
-                                        <p className="text-4xl font-black text-slate-900">
-                                            {analysis.paybackMonths > 12 
-                                                ? (analysis.paybackMonths / 12).toFixed(1) + ' Years' 
-                                                : analysis.paybackMonths.toFixed(1) + ' Months'}
-                                        </p>
+                                        <p className="text-3xl font-black text-slate-900">{analysis.paybackText}</p>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-center gap-6">
-                                    <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1 shadow-inner">
-                                        <button onClick={() => setHubStrategy('single')} className={`px-12 py-3 rounded-xl text-xs font-bold transition-all ${hubStrategy === 'single' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>Pilot (Single Hub)</button>
-                                        <button onClick={() => setHubStrategy('dual')} className={`px-12 py-3 rounded-xl text-xs font-bold transition-all ${hubStrategy === 'dual' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}>Global (Dual Hub)</button>
-                                    </div>
-                                    <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                                        {['worst', 'base', 'best'].map(s => (
-                                            <button key={s} onClick={() => setScenario(s)} className={`px-6 py-2 rounded-lg text-[10px] font-bold transition-all ${scenario === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{s.toUpperCase()}</button>
-                                        ))}
+                                <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center">
+                                    <div><p className="text-xs font-bold text-rose-400 mb-1 uppercase tracking-widest">Baseline Friction Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-bold text-slate-400">Modelled Implementation Cost</p>
+                                        <p className="text-xl font-bold text-white">${analysis.implCost.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -138,47 +124,29 @@
 
                         {view === 'ingest' && (
                             <div className="space-y-10">
-                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Control DNA Workbench</h2><button onClick={() => {}} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl">+ Add Control</button></div>
+                                <h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2>
                                 {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100">
-                                        <div className="grid grid-cols-4 gap-6 pb-6 border-b border-slate-50">
-                                            <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold" /></div>
-                                            <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</select></div>
-                                            <div><label className="field-label">System</label><input value={c.itSystem} onChange={e => updateNode(c.id, 'itSystem', e.target.value)} className="input-box" /></div>
-                                            <div className="text-right"><p className="field-label">Node Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
-                                        </div>
-                                        <div className="flex justify-between items-center pt-4">
+                                    <div key={c.id} className="card-ui p-8 space-y-6 border-l-8 border-indigo-100">
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-xl font-black text-slate-900">{c.controlName}</p>
                                             <div className="flex gap-4">
-                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
-                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
-                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">Clone DNA</button>
+                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
+                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-
+                        
                         {view === 'config' && (
-                            <div className="space-y-12 animate-in fade-in">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="glossary-card">
-                                        <h3 className="text-sm font-black text-indigo-900 mb-3 uppercase tracking-tighter">Strategic: Auto Test Target</h3>
-                                        <p className="text-[11px] text-indigo-800 leading-relaxed">The <b>Auto Test Target</b> represents the "Future State" benchmark for human oversight hours required after automation. This replaces manual sampling with a human-in-the-loop review of AI logic or exception reports.</p>
+                            <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-10">
+                                {Object.entries(levers).map(([k, v]) => (
+                                    <div key={k} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                        <label className="field-label">{k.replace(/([A-Z])/g, ' $1')}</label>
+                                        <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-3xl font-black bg-transparent outline-none w-full text-indigo-600" />
                                     </div>
-                                    <div className="glossary-card border-l-4 border-emerald-500">
-                                        <h3 className="text-sm font-black text-emerald-900 mb-3 uppercase tracking-tighter">Rate Logic: Internal vs. Local</h3>
-                                        <p className="text-[11px] text-emerald-800 leading-relaxed"><b>Local Rate:</b> Cost of the Business Operator (The Doer). <br/><b>Internal Rate:</b> Hourly cost of the Internal Auditor (The Tester). This separation proves the high-value ROI of audit disruption.</p>
-                                    </div>
-                                </div>
-                                <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-10">
-                                    {Object.entries(levers).map(([k, v]) => (
-                                        <div key={k} className="bg-slate-50 p-6 rounded-3xl border border-slate-100 group">
-                                            <label className="field-label group-hover:text-indigo-600 transition-colors">{k.replace(/([A-Z])/g, ' $1')}</label>
-                                            <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-3xl font-black bg-transparent outline-none w-full text-indigo-600" />
-                                        </div>
-                                    ))}
-                                </div>
+                                ))}
                             </div>
                         )}
                     </main>
