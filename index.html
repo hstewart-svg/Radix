@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | v69.0 Budget Reality</title>
+    <title>Radix Shift | v70.0 Integrated ROI Architect</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,11 +13,12 @@
         * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
         body { background: #fcfdfe; color: #0f172a; margin: 0; padding: 0; }
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
-        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.2s ease; }
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; }
+        .input-box:focus { border-color: #6366f1; background: #fff; outline: none; }
         .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
-        .logic-box { background: #f0f9ff; border: 1px solid #e0f2fe; padding: 16px; border-radius: 16px; font-size: 11px; line-height: 1.5; color: #0369a1; }
-        .badge-key { background: #fee2e2; color: #b91c1c; padding: 2px 8px; border-radius: 6px; font-size: 8px; font-weight: 900; }
+        .logic-panel { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 24px; padding: 24px; }
+        .badge-pill { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; }
     </style>
 </head>
 <body>
@@ -28,19 +29,16 @@
 
         const GEOS = ["USA", "Canada", "Mexico", "Brazil", "Germany", "France", "Italy", "Poland", "Romania", "India", "UK"];
         const FREQUENCIES = [{ id: "Daily", mult: 250 }, { id: "Weekly", mult: 52 }, { id: "Monthly", mult: 12 }, { id: "Quarterly", mult: 4 }];
-        const CATEGORIES = ["Business Process (BP)", "ITGC", "ELC", "IPE (Reports)"];
-        const PRIORITIES = ["High", "Medium", "Low"];
         const NATURES = ["Manual", "Automated", "IT-Dependent"];
 
         const App = () => {
             const [view, setView] = useState('home');
             const [hubStrategy, setHubStrategy] = useState('single');
-            const [scenario, setScenario] = useState('base'); // best, base, worst
+            const [scenario, setScenario] = useState('base');
             
             const [levers, setLevers] = useState({ 
                 localRate: 115, euSscRate: 45, asiaSscRate: 22, internalRate: 125,
-                autoTestTarget: 2, fteWorkingHours: 1800, 
-                implCostPerControl: 4500
+                autoTestTarget: 2, fteWorkingHours: 1800, implCostPerControl: 4500
             });
 
             const [rcmData, setRcmData] = useState([
@@ -48,16 +46,14 @@
                     id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", subProcess: "Payments",
                     activity: "Manager reviews bank transmission totals against proposal.",
                     objective: "Accuracy of payments.", risk: "Unauthorized payments.",
-                    itSystem: "NetSuite", country: "Italy", category: "Business Process (BP)", 
-                    nature: "Manual", frequency: "Weekly", priority: "High", 
-                    isKey: true, isFraud: true, complexity: 1.0, 
-                    hoursPerPerformance: 2, iaTodH: 8, iaToeH: 32, status: "Local"
+                    itSystem: "NetSuite", country: "Italy", status: "Local", nature: "Manual",
+                    frequency: "Weekly", hoursPerPerformance: 2, iaTodH: 8, iaToeH: 32,
+                    complexity: 1.0, quarter: "Q1"
                 }
             ]);
 
             const analysis = useMemo(() => {
                 let totalDebt = 0; let totalDiv = 0; let totalCapReclaimed = 0;
-                
                 const efficiencyMap = { best: 0.45, base: 0.35, worst: 0.15 };
                 const currentEff = efficiencyMap[scenario];
 
@@ -65,14 +61,11 @@
                     const freqMult = FREQUENCIES.find(f => f.id === c.frequency)?.mult || 1;
                     const opH = (c.hoursPerPerformance || 0) * freqMult;
                     const iaH = (c.iaTodH || 0) + (c.iaToeH || 0);
-                    
                     const debt = (opH * levers.localRate) + (iaH * levers.internalRate);
+                    
                     let sscRate = (hubStrategy === 'dual' && c.country === "India") ? levers.asiaSscRate : levers.euSscRate;
-                    
                     const sharedCost = (opH * (1 - currentEff)) * sscRate;
-                    const opDiv = c.status === "Shared Service" ? ( (opH * levers.localRate) - sharedCost ) : 0;
-                    
-                    // IA Dividend: Internal labor capacity buy-back (no external fee reduction)
+                    const opDiv = c.status === "Shared Service" ? ((opH * levers.localRate) - sharedCost) : 0;
                     const auditDiv = c.nature === "Automated" ? ((iaH - levers.autoTestTarget) * levers.internalRate) : 0;
                     
                     if (c.status === "Shared Service" || c.nature === "Automated") {
@@ -83,8 +76,7 @@
                     return { ...c, debt, nodeDiv: opDiv + auditDiv, opH, iaH };
                 });
                 
-                const totalImplCost = rcmData.length * levers.implCostPerControl;
-                return { totalDebt, totalDiv, totalCapReclaimed, processed, totalImplCost };
+                return { totalDebt, totalDiv, totalCapReclaimed, processed, implCost: rcmData.length * levers.implCostPerControl };
             }, [rcmData, levers, hubStrategy, scenario]);
 
             const updateNode = (id, field, value) => setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
@@ -94,10 +86,13 @@
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Budget Reality Master v69.0</span></div>
+                        <div className="flex flex-col">
+                            <span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span>
+                            <span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Integrated ROI Architect v70.0</span>
+                        </div>
                         <div className="flex gap-2">
                             {['home', 'ingest', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
@@ -108,22 +103,20 @@
                         {view === 'home' && (
                             <div className="space-y-12 animate-in fade-in">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="p-8 bg-emerald-50 border border-emerald-100 rounded-[2rem] text-center">
-                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Annual Dividend</p>
+                                    <div className="p-8 bg-emerald-50 border border-emerald-100 rounded-[2.5rem] text-center">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Projected Annual Dividend</p>
                                         <p className="text-4xl font-black text-slate-900">${Math.round(analysis.totalDiv).toLocaleString()}</p>
                                     </div>
-                                    <div className="p-8 bg-blue-50 border border-blue-100 rounded-[2rem] text-center">
-                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Capacity Reclaimed</p>
+                                    <div className="p-8 bg-blue-50 border border-blue-100 rounded-[2.5rem] text-center">
+                                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Internal Capacity Reclaimed</p>
                                         <p className="text-4xl font-black text-slate-900">{Math.round(analysis.totalCapReclaimed / levers.fteWorkingHours)} FTEs</p>
                                     </div>
-                                    <div className="p-8 bg-slate-100 border border-slate-200 rounded-[2rem] text-center">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payback Period</p>
-                                        <p className="text-4xl font-black text-slate-900">{((analysis.totalImplCost / (analysis.totalDiv || 1)) * 12).toFixed(1)} <span className="text-sm">Mo.</span></p>
+                                    <div className="p-8 bg-slate-100 border border-slate-200 rounded-[2.5rem] text-center">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payback Timeline</p>
+                                        <p className="text-4xl font-black text-slate-900">{((analysis.implCost / (analysis.totalDiv || 1)) * 12).toFixed(1)} <span className="text-sm">Mo.</span></p>
                                     </div>
                                 </div>
-
                                 <div className="flex flex-col items-center gap-6">
-                                    <label className="field-label text-slate-400">Strategy Sensitivity Scenario</label>
                                     <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
                                         {['worst', 'base', 'best'].map(s => (
                                             <button key={s} onClick={() => setScenario(s)} className={`px-10 py-2.5 rounded-xl text-xs font-bold transition-all ${scenario === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>
@@ -131,59 +124,45 @@
                                             </button>
                                         ))}
                                     </div>
+                                    <button onClick={() => setHubStrategy(hubStrategy === 'single' ? 'dual' : 'single')} className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Toggle Strategy: {hubStrategy.toUpperCase()} HUB</button>
                                 </div>
                             </div>
                         )}
 
                         {view === 'ingest' && (
                             <div className="space-y-10">
-                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100">+ Add New Control</button></div>
-
-                                <div className="logic-box border-indigo-100 bg-indigo-50/50 flex gap-4 items-start">
-                                    <span className="text-xl">💡</span>
-                                    <div>
-                                        <p className="font-bold text-indigo-900 text-xs mb-1 uppercase tracking-tighter">C-Factor Guidance</p>
-                                        <p className="text-indigo-700">Baseline 1.0. Add +0.2 for language, +0.3 for judgment, +0.5 for fragmented systems. This factor directly reduces the dividend.</p>
-                                    </div>
-                                </div>
-
+                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">DNA Workbench</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl">+ Add New Control</button></div>
                                 {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-10 border-l-8 border-indigo-100 relative group">
-                                        
+                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100">
                                         <div className="grid grid-cols-4 gap-6 pb-6 border-b border-slate-50">
-                                            <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold text-slate-900" /></div>
+                                            <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold" /></div>
                                             <div><label className="field-label">Cycle & Process</label><p className="text-[11px] font-bold text-slate-400">{c.cycle} &gt; {c.process}</p></div>
                                             <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</select></div>
-                                            <div className="text-right"><p className="field-label">Calculated Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
+                                            <div className="text-right"><p className="field-label">Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
                                         </div>
-
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                             <div className="space-y-6">
                                                 <label className="field-label">Control Activity Description</label>
                                                 <textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-24 text-left font-normal" />
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">Risk Mitigated</label><textarea value={c.risk} onChange={e => updateNode(c.id, 'risk', e.target.value)} className="input-box h-16" /></div>
-                                                    <div><label className="field-label">Objective</label><textarea value={c.objective} onChange={e => updateNode(c.id, 'objective', e.target.value)} className="input-box h-16" /></div>
+                                                    <div><label className="field-label">Hours / Perf.</label><input type="number" step="0.5" value={c.hoursPerPerformance} onChange={e => updateNode(c.id, 'hoursPerPerformance', Number(e.target.value))} className="input-box" /></div>
+                                                    <div><label className="field-label">Complexity</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box" /></div>
                                                 </div>
                                             </div>
                                             <div className="space-y-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">Hours / Perf.</label><input type="number" value={c.hoursPerPerformance} onChange={e => updateNode(c.id, 'hoursPerPerformance', Number(e.target.value))} className="input-box bg-white" /></div>
-                                                    <div><label className="field-label">Complexity</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box bg-white" /></div>
-                                                </div>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div><label className="field-label">IA TOD/TOO Hrs</label><input type="number" value={c.iaTodH} onChange={e => updateNode(c.id, 'iaTodH', Number(e.target.value))} className="input-box bg-white" /></div>
                                                     <div><label className="field-label">IA TOE Hrs</label><input type="number" value={c.iaToeH} onChange={e => updateNode(c.id, 'iaToeH', Number(e.target.value))} className="input-box bg-white" /></div>
                                                 </div>
                                                 <div><label className="field-label">Geography</label><select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box bg-white">{GEOS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
+                                                <div><label className="field-label">IT System</label><input value={c.itSystem} onChange={e => updateNode(c.id, 'itSystem', e.target.value)} className="input-box bg-white" /></div>
                                             </div>
                                         </div>
-
                                         <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                             <div className="flex gap-3">
-                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
-                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
-                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition-all">Clone DNA</button>
+                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
+                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
+                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100">Clone DNA</button>
                                             </div>
                                             <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Delete</button>
                                         </div>
