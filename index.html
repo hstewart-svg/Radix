@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | v62.0 Operator & Auditor Master</title>
+    <title>Radix Shift | v63.0 Economic Precision</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -17,7 +17,7 @@
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; }
         .input-box:focus { border-color: #6366f1; background: #fff; outline: none; }
         .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
-        .logic-box { background: #f0f9ff; border: 1px solid #e0f2fe; padding: 16px; border-radius: 16px; font-size: 11px; line-height: 1.5; color: #0369a1; }
+        .calc-badge { background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -26,18 +26,24 @@
     <script type="text/babel">
         const { useState, useMemo } = React;
 
-        const GEOS = ["Poland", "Romania", "India", "Philippines", "Germany", "Italy", "France", "USA", "UK"];
-        const FREQUENCIES = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual", "Event-Driven"];
+        const FREQUENCIES = [
+            { id: "Daily", mult: 250 },
+            { id: "Weekly", mult: 52 },
+            { id: "Monthly", mult: 12 },
+            { id: "Quarterly", mult: 4 },
+            { id: "Annual", mult: 1 },
+            { id: "Event-Driven", mult: 20 }
+        ];
+        
         const CONTROL_TYPES = ["Manual", "IT Automated Control (ITAC)"];
-        const NATURES = ["Manual", "Automated", "IT-Dependent"];
+        const GEOS = ["Poland", "Romania", "India", "Philippines", "Germany", "Italy", "France", "USA", "UK"];
 
         const App = () => {
             const [view, setView] = useState('ingest');
             const [hubStrategy, setHubStrategy] = useState('single');
             const [levers, setLevers] = useState({ 
                 localRate: 115, euSscRate: 45, asiaSscRate: 22, 
-                internalRate: 125, externalRate: 245, 
-                autoTestTarget: 2, coeEfficiencyLift: 35 
+                internalRate: 125, autoTestTarget: 2, coeEfficiencyLift: 35 
             });
 
             const [rcmData, setRcmData] = useState([
@@ -45,43 +51,45 @@
                     id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", 
                     activity: "Manager reviews bank transmission totals against proposal.",
                     country: "Italy", status: "Local", nature: "Manual", controlType: "Manual",
-                    frequency: "Weekly", complexity: 1.0, execH: 1200, 
-                    sampleSize: 25, minPerSample: 45, quarter: "Q1", itSystem: "NetSuite", reports: [] 
+                    frequency: "Weekly", complexity: 1.0, minsPerPerformance: 120, 
+                    manualTesterH: 40, quarter: "Q1", itSystem: "NetSuite"
                 }
             ]);
 
             const analysis = useMemo(() => {
                 let totalDebt = 0; let totalDiv = 0;
                 const processed = rcmData.map(c => {
-                    const testH = ((c.sampleSize || 0) * (c.minPerSample || 0)) / 60;
-                    const pDebt = (c.execH || 0) * levers.localRate;
-                    const aDebt = testH * levers.internalRate;
+                    const freqMult = FREQUENCIES.find(f => f.id === c.frequency)?.mult || 1;
+                    const calculatedOpH = (c.minsPerPerformance * freqMult) / 60;
+                    
+                    const pDebt = calculatedOpH * levers.localRate;
+                    const aDebt = (c.manualTesterH || 0) * levers.internalRate;
                     const nodeDebt = pDebt + aDebt;
                     
                     let sscRate = (hubStrategy === 'dual' && ["India", "Philippines"].includes(c.country)) ? levers.asiaSscRate : levers.euSscRate;
                     const netLift = levers.coeEfficiencyLift / (c.complexity || 1);
-                    const sharedCost = ((c.execH || 0) * (1 - (netLift/100))) * sscRate;
+                    const sharedCost = (calculatedOpH * (1 - (netLift/100))) * sscRate;
                     
                     const opDiv = c.status === "Shared Service" ? (pDebt - sharedCost) : 0;
-                    const auditDiv = c.nature === "Automated" ? ((testH - levers.autoTestTarget) * levers.internalRate) : 0;
+                    const auditDiv = c.nature === "Automated" ? (((c.manualTesterH || 0) - levers.autoTestTarget) * levers.internalRate) : 0;
                     
                     totalDebt += nodeDebt; totalDiv += (opDiv + auditDiv);
-                    return { ...c, nodeDebt, nodeDiv: opDiv + auditDiv, testH };
+                    return { ...c, nodeDebt, nodeDiv: opDiv + auditDiv, calculatedOpH };
                 });
                 return { totalDebt, totalDiv, processed };
             }, [rcmData, levers, hubStrategy]);
 
             const updateNode = (id, field, value) => setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
-            const addControl = () => setRcmData([{ id: Date.now(), controlName: "NEW-CTRL", cycle: "Cycle", activity: "", nature: "Manual", controlType: "Manual", frequency: "Monthly", complexity: 1.0, country: "Poland", execH: 100, sampleSize: 25, minPerSample: 30, status: "Local", reports: [] }, ...rcmData]);
+            const addControl = () => setRcmData([{ id: Date.now(), controlName: "NEW-CTRL", cycle: "Cycle", activity: "", nature: "Manual", controlType: "Manual", frequency: "Monthly", complexity: 1.0, country: "Poland", minsPerPerformance: 60, manualTesterH: 20, status: "Local" }, ...rcmData]);
             const cloneNode = (item) => setRcmData([{ ...item, id: Date.now(), controlName: item.controlName + " (Copy)" }, ...rcmData]);
 
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">DNA Architect v62.0</span></div>
+                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Economic Precision v63.0</span></div>
                         <div className="flex gap-2">
                             {['home', 'ingest', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
@@ -92,50 +100,40 @@
                         {view === 'ingest' && (
                             <div className="space-y-8 animate-in slide-in-from-bottom-4">
                                 <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100">+ Add New Control</button></div>
-                                
-                                <div className="logic-box border-indigo-100 bg-indigo-50/50 flex gap-4 items-start">
-                                    <span className="text-xl">📊</span>
-                                    <p className="text-indigo-800"><b>Differentiate your Economics:</b> <u>Operator Hours</u> represent the time spent *performing* the control (Business Unit cost). <u>Auditor Hours</u> represent the time spent *testing* the control (IA cost). Automation reduces both simultaneously.</p>
-                                </div>
 
                                 {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-10 border-l-8 border-indigo-100 relative group">
-                                        
-                                        {/* HEADER SECTION */}
+                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100 group">
                                         <div className="grid grid-cols-4 gap-6 pb-6 border-b border-slate-50">
                                             <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold" /></div>
                                             <div><label className="field-label">Control Type</label><select value={c.controlType} onChange={e => updateNode(c.id, 'controlType', e.target.value)} className="input-box text-indigo-600">{CONTROL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                                            <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}</select></div>
-                                            <div className="text-right"><p className="field-label">Node Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
+                                            <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</select></div>
+                                            <div className="text-right"><p className="field-label">Calculated Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
                                         </div>
 
-                                        {/* DESCRIPTION SECTION */}
-                                        <div><label className="field-label">Control Activity Description</label><textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-24 text-left font-normal" placeholder="Describe the control performance steps here..." /></div>
+                                        <div><label className="field-label">Control Activity Description</label><textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-20 text-left font-normal" /></div>
 
-                                        {/* PERFORMANCE & TESTING MATH */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                             <div className="space-y-6">
-                                                <h4 className="text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 pb-2">Business Performance (The "Doer")</h4>
+                                                <div className="flex justify-between items-center border-b border-slate-100 pb-2"><h4 className="text-[10px] font-black uppercase text-slate-400">Business Performance</h4><span className="calc-badge">{Math.round(c.calculatedOpH)} Annual Hours</span></div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">Operator Hours (Annual)</label><input type="number" value={c.execH} onChange={e => updateNode(c.id, 'execH', Number(e.target.value))} className="input-box" /></div>
-                                                    <div><label className="field-label">C-Factor (Complexity)</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box" /></div>
+                                                    <div><label className="field-label">Mins to Perform (Per Instance)</label><input type="number" value={c.minsPerPerformance} onChange={e => updateNode(c.id, 'minsPerPerformance', Number(e.target.value))} className="input-box" /></div>
+                                                    <div><label className="field-label">Complexity (C-Factor)</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box" /></div>
                                                 </div>
                                             </div>
                                             <div className="space-y-6">
-                                                <h4 className="text-[10px] font-black uppercase text-slate-400 border-b border-slate-100 pb-2">Internal Audit (The "Tester")</h4>
+                                                <div className="flex justify-between items-center border-b border-slate-100 pb-2"><h4 className="text-[10px] font-black uppercase text-slate-400">Internal Audit Testing</h4></div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">Sample Size</label><input type="number" value={c.sampleSize} onChange={e => updateNode(c.id, 'sampleSize', Number(e.target.value))} className="input-box" /></div>
-                                                    <div><label className="field-label">Mins / Sample</label><input type="number" value={c.minPerSample} onChange={e => updateNode(c.id, 'minPerSample', Number(e.target.value))} className="input-box" /></div>
+                                                    <div><label className="field-label">Manual IA Tester Hours (Annual)</label><input type="number" value={c.manualTesterH} onChange={e => updateNode(c.id, 'manualTesterH', Number(e.target.value))} className="input-box" /></div>
+                                                    <div><label className="field-label">Geography</label><select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box">{GEOS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* ACTIONS BAR */}
                                         <div className="flex justify-between items-center pt-6 border-t border-slate-50">
                                             <div className="flex gap-3">
                                                 <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
-                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
-                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100 transition-all">Clone DNA</button>
+                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
+                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition-all">Clone DNA</button>
                                             </div>
                                             <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Delete Node</button>
                                         </div>
@@ -147,8 +145,8 @@
                         {view === 'home' && (
                             <div className="space-y-12 animate-in fade-in">
                                 <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center shadow-xl">
-                                    <div><p className="text-xs font-bold uppercase text-rose-400 mb-1">Total System Friction</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
-                                    <div className="text-right"><p className="text-xs font-bold uppercase text-emerald-400 mb-1 tracking-widest">Global Dividend</p><p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p></div>
+                                    <div><p className="text-xs font-bold uppercase text-rose-400 mb-1">Friction Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
+                                    <div className="text-right"><p className="text-xs font-bold uppercase text-emerald-400 mb-1 tracking-widest">Calculated Dividend</p><p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p></div>
                                 </div>
                                 <div className="flex justify-center gap-4">
                                     <button onClick={() => setHubStrategy('single')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'single' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>Pilot Hub (Single)</button>
