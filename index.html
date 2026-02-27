@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radix Shift | v64.0 SOX Methodology</title>
+    <title>Radix Shift | v65.0 Economic Transparency</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -15,10 +15,9 @@
         .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
         .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); }
         .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; }
-        .input-box:focus { border-color: #6366f1; background: #fff; outline: none; }
         .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
-        .calc-badge { background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; }
-        .audit-header { border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .logic-panel { background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 24px; padding: 24px; }
+        .formula { font-family: 'Courier New', monospace; background: #fff; padding: 4px 8px; border-radius: 6px; font-weight: 800; color: #4f46e5; }
     </style>
 </head>
 <body>
@@ -28,29 +27,23 @@
         const { useState, useMemo } = React;
 
         const FREQUENCIES = [
-            { id: "Daily", mult: 250 },
-            { id: "Weekly", mult: 52 },
-            { id: "Monthly", mult: 12 },
-            { id: "Quarterly", mult: 4 },
-            { id: "Annual", mult: 1 },
-            { id: "Event-Driven", mult: 20 }
+            { id: "Daily", mult: 250 }, { id: "Weekly", mult: 52 }, { id: "Monthly", mult: 12 },
+            { id: "Quarterly", mult: 4 }, { id: "Annual", mult: 1 }, { id: "Event-Driven", mult: 20 }
         ];
-        
-        const CONTROL_TYPES = ["Manual", "IT Automated Control (ITAC)"];
-        const GEOS = ["Poland", "Romania", "India", "Philippines", "Germany", "Italy", "France", "USA", "UK"];
 
         const App = () => {
-            const [view, setView] = useState('ingest');
+            const [view, setView] = useState('home');
             const [hubStrategy, setHubStrategy] = useState('single');
             const [levers, setLevers] = useState({ 
                 localRate: 115, euSscRate: 45, asiaSscRate: 22, 
-                internalRate: 125, autoTestTarget: 2, coeEfficiencyLift: 35 
+                internalRate: 125, externalRate: 245, 
+                autoTestTarget: 2, coeEfficiencyLift: 35 
             });
 
             const [rcmData, setRcmData] = useState([
                 { 
                     id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", 
-                    activity: "Manager reviews bank transmission totals against proposal.",
+                    activity: "Manager reviews bank transmission totals.",
                     country: "Italy", status: "Local", nature: "Manual", controlType: "Manual",
                     frequency: "Weekly", complexity: 1.0, hoursPerPerformance: 2, 
                     iaTodH: 8, iaToeH: 32, quarter: "Q1", itSystem: "NetSuite"
@@ -73,7 +66,6 @@
                     const sharedCost = (calculatedOpH * (1 - (netLift/100))) * sscRate;
                     
                     const opDiv = c.status === "Shared Service" ? (pDebt - sharedCost) : 0;
-                    // IA Dividend: When automated, we reduce the burden to the Auto Test Target
                     const auditDiv = c.nature === "Automated" ? ((manualIaTotalH - levers.autoTestTarget) * levers.internalRate) : 0;
                     
                     totalDebt += nodeDebt; totalDiv += (opDiv + auditDiv);
@@ -83,93 +75,89 @@
             }, [rcmData, levers, hubStrategy]);
 
             const updateNode = (id, field, value) => setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
-            const addControl = () => setRcmData([{ id: Date.now(), controlName: "NEW-CTRL", cycle: "Cycle", activity: "", nature: "Manual", controlType: "Manual", frequency: "Monthly", complexity: 1.0, country: "Poland", hoursPerPerformance: 1, iaTodH: 4, iaToeH: 16, status: "Local" }, ...rcmData]);
-            const cloneNode = (item) => setRcmData([{ ...item, id: Date.now(), controlName: item.controlName + " (Copy)" }, ...rcmData]);
 
             return (
                 <div className="min-h-screen pb-20">
                     <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
-                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">SOX Methodology Master v64.0</span></div>
+                        <div className="flex flex-col"><span className="text-xl font-black text-slate-900">Radix Shift</span><span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Economic Transparency v65.0</span></div>
                         <div className="flex gap-2">
                             {['home', 'ingest', 'config'].map(v => (
-                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
                                     {v === 'ingest' ? 'Architect' : v.charAt(0).toUpperCase() + v.slice(1)}
                                 </button>
                             ))}
                         </div>
                     </nav>
 
-                    <main className="max-w-6xl mx-auto px-6 mt-12 space-y-10">
-                        {view === 'ingest' && (
-                            <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2><button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100">+ Add New Control</button></div>
-
-                                {analysis.processed.map(c => (
-                                    <div key={c.id} className="card-ui p-8 space-y-8 border-l-8 border-indigo-100 group">
-                                        {/* HEADER SECTION */}
-                                        <div className="grid grid-cols-4 gap-6 pb-6 border-b border-slate-50">
-                                            <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold" /></div>
-                                            <div><label className="field-label">Control Type</label><select value={c.controlType} onChange={e => updateNode(c.id, 'controlType', e.target.value)} className="input-box text-indigo-600">{CONTROL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                                            <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</select></div>
-                                            <div className="text-right"><p className="field-label">Total Node Dividend</p><p className="text-xl font-black text-emerald-600">${Math.round(c.nodeDiv).toLocaleString()}</p></div>
-                                        </div>
-
-                                        {/* DESCRIPTION */}
-                                        <div><label className="field-label">Control Activity Description</label><textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-20 text-left font-normal" /></div>
-
-                                        {/* SOX METHODOLOGY GRID */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                            {/* OPERATOR PERFORMANCE */}
-                                            <div className="space-y-6">
-                                                <div className="audit-header"><h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Control Performance (Operator)</h4><span className="calc-badge">{Math.round(c.calculatedOpH)} Annual Hrs</span></div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">Hours / Performance</label><input type="number" step="0.5" value={c.hoursPerPerformance} onChange={e => updateNode(c.id, 'hoursPerPerformance', Number(e.target.value))} className="input-box" /></div>
-                                                    <div><label className="field-label">Complexity (C-Factor)</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box" /></div>
-                                                </div>
-                                            </div>
-                                            {/* IA TESTING */}
-                                            <div className="space-y-6">
-                                                <div className="audit-header"><h4 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Audit Testing (IA)</h4><span className="calc-badge">{Math.round(c.manualIaTotalH)} Annual Hrs</span></div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div><label className="field-label">TOD / Walkthrough / TOO</label><input type="number" value={c.iaTodH} onChange={e => updateNode(c.id, 'iaTodH', Number(e.target.value))} className="input-box" /></div>
-                                                    <div><label className="field-label">TOE (Effectiveness)</label><input type="number" value={c.iaToeH} onChange={e => updateNode(c.id, 'iaToeH', Number(e.target.value))} className="input-box" /></div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* ACTIONS BAR */}
-                                        <div className="flex justify-between items-center pt-6 border-t border-slate-50">
-                                            <div className="flex gap-3">
-                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
-                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-200'}`}>{c.nature === 'Automated' ? '✓ Automated' : 'Automate'}</button>
-                                                <button onClick={() => cloneNode(c)} className="px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 transition-all">Clone DNA</button>
-                                            </div>
-                                            <button onClick={() => setRcmData(rcmData.filter(n => n.id !== c.id))} className="text-[10px] font-bold text-rose-300 uppercase hover:text-rose-500">Delete Node</button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
+                    <main className="max-w-6xl mx-auto px-6 mt-12 space-y-12">
                         {view === 'home' && (
                             <div className="space-y-12 animate-in fade-in">
                                 <div className="card-ui p-10 bg-slate-900 text-white flex justify-between items-center shadow-xl">
                                     <div><p className="text-xs font-bold uppercase text-rose-400 mb-1">Friction Debt</p><p className="text-5xl font-black">${Math.round(analysis.totalDebt).toLocaleString()}</p></div>
-                                    <div className="text-right"><p className="text-xs font-bold uppercase text-emerald-400 mb-1 tracking-widest">Global Dividend</p><p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p></div>
+                                    <div className="text-right"><p className="text-xs font-bold uppercase text-emerald-400 mb-1 tracking-widest">Calculated Dividend</p><p className="text-4xl font-bold text-emerald-500">${Math.round(analysis.totalDiv).toLocaleString()}</p></div>
                                 </div>
-                                <div className="flex justify-center gap-4">
-                                    <button onClick={() => setHubStrategy('single')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'single' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>Pilot Hub (Single)</button>
-                                    <button onClick={() => setHubStrategy('dual')} className={`px-8 py-3 rounded-2xl text-xs font-bold border ${hubStrategy === 'dual' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>Global Hub (Dual)</button>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="logic-panel border-l-4 border-rose-400">
+                                        <h3 className="text-lg font-black text-slate-900 mb-4 uppercase tracking-tighter">Understanding Friction Debt</h3>
+                                        <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                                            Friction Debt is the <b>hidden tax</b> of decentralization. It measures the total annual cost of performing and testing controls in their current "as-is" state.
+                                        </p>
+                                        <div className="bg-white p-4 rounded-xl text-xs space-y-2 border border-slate-100">
+                                            <p><b>Performance Debt:</b> <span className="formula">(Annual Op Hours × Local Rate)</span></p>
+                                            <p><b>Testing Debt:</b> <span className="formula">(Annual IA Hours × Internal Rate)</span></p>
+                                        </div>
+                                    </div>
+                                    <div className="logic-panel border-l-4 border-emerald-400">
+                                        <h3 className="text-lg font-black text-slate-900 mb-4 uppercase tracking-tighter">Understanding Calculated Dividend</h3>
+                                        <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                                            The Dividend represents the <b>value unlocked</b> through transformation. It is the delta between "Local Legacy Cost" and "Optimized Hub/Auto Cost."
+                                        </p>
+                                        <div className="bg-white p-4 rounded-xl text-xs space-y-2 border border-slate-100">
+                                            <p><b>Standardization Dividend:</b> Local Labor Cost - Hub Labor Cost</p>
+                                            <p><b>Automation Dividend:</b> Manual Testing Cost - Agentic AI Testing Cost</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {view === 'config' && (
-                            <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-8 animate-in fade-in">
-                                {Object.entries(levers).map(([k, v]) => (
-                                    <div key={k} className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                                        <label className="field-label">{k.replace(/([A-Z])/g, ' $1')}</label>
-                                        <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-2xl font-black bg-transparent outline-none w-full text-indigo-600" />
+                            <div className="space-y-12 animate-in fade-in">
+                                <div className="logic-panel border-indigo-200 bg-indigo-50/50">
+                                    <h3 className="text-lg font-black text-indigo-900 mb-4 uppercase tracking-tighter">Rate Logic: Local vs. Internal</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm text-indigo-800 leading-relaxed">
+                                        <div>
+                                            <p className="font-bold mb-2 underline decoration-indigo-300">Local Rate (The "Doer")</p>
+                                            <p>The fully-burdened hourly cost of the <b>Business Unit (Operator)</b>. This rate represents the salary, benefits, and overhead of the people performing the control in local entities (e.g., USA vs. Italy).</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-bold mb-2 underline decoration-indigo-300">Internal Rate (The "Tester")</p>
+                                            <p>The hourly cost of the <b>Internal Audit Department (IA)</b>. This rate is used to calculate the cost of testing the control. It is usually higher than the Local Rate due to the specialized nature of the audit function.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-8">
+                                    {Object.entries(levers).map(([k, v]) => (
+                                        <div key={k} className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                            <label className="field-label">{k.replace(/([A-Z])/g, ' $1')}</label>
+                                            <input type="number" value={v} onChange={e => setLevers({...levers, [k]: Number(e.target.value)})} className="text-2xl font-black bg-transparent outline-none w-full text-indigo-600" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        
+                        {view === 'ingest' && (
+                            <div className="space-y-8">
+                                <div className="flex justify-between items-center"><h2 className="text-2xl font-black text-slate-900 uppercase">Control DNA Workbench</h2><button onClick={() => {}} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold">+ Add New Control</button></div>
+                                {analysis.processed.map(c => (
+                                    <div key={c.id} className="card-ui p-8 space-y-6 border-l-8 border-indigo-100">
+                                        <div className="grid grid-cols-4 gap-6">
+                                            <div><label className="field-label">Control ID</label><p className="font-bold">{c.controlName}</p></div>
+                                            <div><label className="field-label">Frequency</label><p className="font-bold">{c.frequency}</p></div>
+                                            <div className="col-span-2 text-right"><label className="field-label">Current Debt</label><p className="text-xl font-black text-rose-500">${Math.round(c.nodeDebt).toLocaleString()}</p></div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
