@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radix</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/recharts@2.12.7/umd/recharts.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Plus Jakarta Sans', sans-serif !important; -webkit-font-smoothing: antialiased; }
+        body { background: #fcfdfe; color: #0f172a; margin: 0; padding: 0; }
+        .nav-blur { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #f1f5f9; }
+        .card-ui { background: #ffffff; border: 1px solid #f1f5f9; border-radius: 28px; box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04); transition: all 0.2s ease; }
+        .input-box { background: #f8fafc; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; border: 1px solid transparent; width: 100%; box-sizing: border-box; }
+        .input-box:focus { border-color: #6366f1; background: #fff; outline: none; }
+        .field-label { font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+        .glossary-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px; border-left: 4px solid #4f46e5; height: 100%; }
+        .stat-card { padding: 32px; border-radius: 32px; text-align: center; height: 100%; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-4px); }
+        .drop-zone { border: 2px dashed #c7d2fe; border-radius: 20px; padding: 40px; text-align: center; transition: all 0.2s; background: #f5f7ff; cursor: pointer; }
+        .drop-zone:hover, .drop-zone.drag-over { border-color: #6366f1; background: #eef2ff; }
+        .scenario-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+        .saved-scenario-row { border: 1px solid #f1f5f9; border-radius: 16px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: pointer; transition: all 0.15s; }
+        .saved-scenario-row:hover { background: #f8faff; border-color: #c7d2fe; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+            .nav-blur { box-shadow: none; border: none; }
+        }
+        .print-only { display: none; }
+        .waterfall-tooltip { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .confidence-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef, useCallback } = React;
+        const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine } = window.Recharts || {};
+
+        const GEOS = ["USA", "Canada", "Mexico", "Brazil", "Germany", "France", "Italy", "Poland", "Romania", "India", "UK"];
+        const FREQUENCIES = [{ id: "Daily", mult: 250 }, { id: "Weekly", mult: 52 }, { id: "Monthly", mult: 12 }, { id: "Quarterly", mult: 4 }];
+        const CONFIDENCE_LEVELS = [
+            { id: "high", label: "High", color: "#10b981", effMult: 1.0 },
+            { id: "medium", label: "Medium", color: "#f59e0b", effMult: 0.75 },
+            { id: "low", label: "Low", color: "#ef4444", effMult: 0.5 },
+        ];
+
+        const DEFAULT_LEVERS = { localRate: 115, euSscRate: 45, asiaSscRate: 22, internalRate: 125, autoTestTarget: 2, fteWorkingHours: 1800, coeEfficiencyLift: 35 };
+        const DEFAULT_CONTROLS = [
+            { id: 1, controlName: "PMT-01", cycle: "P2P", process: "Accounts Payable", subProcess: "Payments", activity: "Manager reviews bank transmission totals against proposal.", country: "Italy", status: "Local", nature: "Manual", frequency: "Weekly", hoursPerPerformance: 2, iaTodWalkthroughH: 8, iaToeH: 32, complexity: 1.0, confidence: "high", itSystem: "NetSuite", risk: "Unauthorized payments.", objective: "Ensure payment accuracy." }
+        ];
+
+        const STORAGE_KEY_DATA = 'radix_rcm_data';
+        const STORAGE_KEY_LEVERS = 'radix_levers';
+        const STORAGE_KEY_SCENARIOS = 'radix_saved_scenarios';
+
+        function loadFromStorage(key, fallback) {
+            try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+        }
+        function saveToStorage(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+        }
+
+        const fmt = (n) => '$' + Math.round(n).toLocaleString();
+        const fmtK = (n) => { const abs = Math.abs(n); return (n < 0 ? '-$' : '$') + (abs >= 1000 ? (abs/1000).toFixed(1) + 'k' : Math.round(abs).toLocaleString()); };
+
+        // ── CSV Import ────────────────────────────────────────────────────────────
+        function parseCSV(text) {
+            const lines = text.trim().split(/\r?\n/);
+            if (lines.length < 2) return null;
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase().replace(/\s+/g, ''));
+            const map = {
+                controlname: 'controlName', cycle: 'cycle', process: 'process', subprocess: 'subProcess',
+                activity: 'activity', country: 'country', status: 'status', nature: 'nature',
+                frequency: 'frequency', hoursperperformance: 'hoursPerPerformance',
+                iatodwalkthroughh: 'iaTodWalkthroughH', iatoeh: 'iaToeH',
+                complexity: 'complexity', itsystem: 'itSystem', risk: 'risk', objective: 'objective',
+                confidence: 'confidence',
+                // common aliases
+                controlid: 'controlName', hrs: 'hoursPerPerformance', hours: 'hoursPerPerformance',
+                geo: 'country', geography: 'country',
+            };
+            const controls = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const obj = { id: Date.now() + i, status: 'Local', nature: 'Manual', frequency: 'Monthly', complexity: 1.0, confidence: 'high', hoursPerPerformance: 1, iaTodWalkthroughH: 4, iaToeH: 16, country: 'USA', itSystem: 'ERP', risk: '', objective: '', activity: '', subProcess: '', cycle: '' };
+                headers.forEach((h, idx) => {
+                    const field = map[h] || h;
+                    let val = vals[idx] || '';
+                    if (['hoursPerPerformance','iaTodWalkthroughH','iaToeH','complexity'].includes(field)) val = parseFloat(val) || obj[field];
+                    obj[field] = val;
+                });
+                if (obj.controlName) controls.push(obj);
+            }
+            return controls.length ? controls : null;
+        }
+
+        // ── Export PDF / Print ────────────────────────────────────────────────────
+        function triggerPrint() { window.print(); }
+
+        // ── WaterfallChart ────────────────────────────────────────────────────────
+        function WaterfallChart({ totalDebt, hubSavings, autoSavings, totalDiv }) {
+            if (!ResponsiveContainer) {
+                // Recharts not loaded — render a simple CSS bar fallback
+                const bars = [
+                    { label: 'Friction Debt', value: totalDebt, color: '#f87171' },
+                    { label: 'Hub Savings', value: hubSavings, color: '#34d399' },
+                    { label: 'Automation Savings', value: autoSavings, color: '#818cf8' },
+                    { label: 'Net Dividend', value: totalDiv, color: '#10b981' },
+                ];
+                const maxVal = Math.max(...bars.map(b => b.value)) || 1;
+                return (
+                    <div className="card-ui p-8 mt-8">
+                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6">Value Bridge — Friction → Dividend</h3>
+                        <div className="flex items-end gap-4 h-40">
+                            {bars.map((b, i) => (
+                                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2">
+                                    <span className="text-[9px] font-black text-slate-500">{fmtK(b.value)}</span>
+                                    <div style={{ height: Math.max(8, (b.value / maxVal) * 120) + 'px', background: b.color, borderRadius: '8px 8px 0 0', width: '100%', opacity: 0.9 }}></div>
+                                    <span className="text-[9px] font-bold text-slate-400 text-center leading-tight">{b.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+            const data = [
+                { name: 'Friction Debt', value: totalDebt, fill: '#f87171' },
+                { name: 'Hub Savings', value: hubSavings, fill: '#34d399' },
+                { name: 'Automation Savings', value: autoSavings, fill: '#818cf8' },
+                { name: 'Net Dividend', value: totalDiv, fill: '#10b981' },
+            ];
+            return (
+                <div className="card-ui p-8 mt-8">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6">Value Bridge — Friction → Dividend</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={data} margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
+                            <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis tickFormatter={fmtK} tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                            <Tooltip content={({ active, payload }) => {
+                                if (!active || !payload?.length) return null;
+                                const d = payload[0];
+                                return <div className="waterfall-tooltip"><div className="text-slate-400 text-[9px] font-black uppercase">{d.payload.name}</div><div className="text-slate-900 font-black">{fmt(Math.abs(d.value))}</div></div>;
+                            }} />
+                            <Bar dataKey="value" radius={[8,8,0,0]}>
+                                {data.map((entry, i) => <Cell key={i} fill={entry.fill} fillOpacity={0.9} />)}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            );
+        }
+
+        // ── Main App ──────────────────────────────────────────────────────────────
+        const App = () => {
+            const [view, setView] = useState('home');
+            const [hubStrategy, setHubStrategy] = useState('single');
+            const [scenario, setScenario] = useState('base');
+            const [levers, setLevers] = useState(() => loadFromStorage(STORAGE_KEY_LEVERS, DEFAULT_LEVERS));
+            const [rcmData, setRcmData] = useState(() => loadFromStorage(STORAGE_KEY_DATA, DEFAULT_CONTROLS));
+            const [savedScenarios, setSavedScenarios] = useState(() => loadFromStorage(STORAGE_KEY_SCENARIOS, []));
+            const [saveModalOpen, setSaveModalOpen] = useState(false);
+            const [newScenarioName, setNewScenarioName] = useState('');
+            const [importStatus, setImportStatus] = useState(null); // {type: 'success'|'error', msg}
+            const [dragOver, setDragOver] = useState(false);
+            const fileInputRef = useRef(null);
+
+            // Persist on change
+            useEffect(() => { saveToStorage(STORAGE_KEY_DATA, rcmData); }, [rcmData]);
+            useEffect(() => { saveToStorage(STORAGE_KEY_LEVERS, levers); }, [levers]);
+            useEffect(() => { saveToStorage(STORAGE_KEY_SCENARIOS, savedScenarios); }, [savedScenarios]);
+
+            const efficiencyMap = { best: 0.45, base: 0.35, worst: 0.15 };
+
+            const analysis = useMemo(() => {
+                let totalDebt = 0, hubSavings = 0, autoSavings = 0, totalCapReclaimed = 0;
+                const currentEff = efficiencyMap[scenario];
+
+                const processed = rcmData.map(c => {
+                    const freqMult = FREQUENCIES.find(f => f.id === c.frequency)?.mult || 1;
+                    const opH = (c.hoursPerPerformance || 0) * freqMult;
+                    const iaH = (c.iaTodWalkthroughH || 0) + (c.iaToeH || 0);
+                    const debt = (opH * levers.localRate) + (iaH * levers.internalRate);
+
+                    let sscRate = (hubStrategy === 'dual' && c.country === "India") ? levers.asiaSscRate : levers.euSscRate;
+                    const confMult = CONFIDENCE_LEVELS.find(cl => cl.id === c.confidence)?.effMult || 1.0;
+                    const netLift = (levers.coeEfficiencyLift * confMult) / (c.complexity || 1);
+                    const sharedCost = (opH * (1 - (netLift / 100))) * sscRate;
+
+                    const opDiv = c.status === "Shared Service" ? ((opH * levers.localRate) - sharedCost) : 0;
+                    const auditDiv = c.nature === "Automated" ? ((iaH - levers.autoTestTarget) * levers.internalRate) : 0;
+
+                    if (c.status === "Shared Service") hubSavings += opDiv;
+                    if (c.nature === "Automated") autoSavings += auditDiv;
+
+                    if (c.status === "Shared Service" || c.nature === "Automated") {
+                        totalCapReclaimed += (opH * (levers.coeEfficiencyLift / 100)) + (c.nature === "Automated" ? Math.max(0, iaH - levers.autoTestTarget) : 0);
+                    }
+
+                    totalDebt += debt;
+                    return { ...c, debt, nodeDiv: opDiv + auditDiv, opH, iaH };
+                });
+
+                const totalDiv = hubSavings + autoSavings;
+                return { totalDebt, totalDiv, hubSavings, autoSavings, totalCapReclaimed, processed };
+            }, [rcmData, levers, hubStrategy, scenario]);
+
+            const updateNode = (id, field, value) => setRcmData(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
+            const addControl = () => setRcmData([{ id: Date.now(), controlName: "NEW-" + rcmData.length, cycle: "Cycle", process: "Process", subProcess: "Sub", country: "USA", frequency: "Monthly", nature: "Manual", status: "Local", complexity: 1.0, confidence: "high", hoursPerPerformance: 1, iaTodWalkthroughH: 4, iaToeH: 16, itSystem: "ERP", risk: "", objective: "", activity: "" }, ...rcmData]);
+            const deleteControl = (id) => setRcmData(prev => prev.filter(n => n.id !== id));
+            const cloneNode = (item) => setRcmData([{ ...item, id: Date.now(), controlName: item.controlName + " (Copy)" }, ...rcmData]);
+
+            // ── CSV handling ──
+            const handleFileImport = useCallback((file) => {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const controls = parseCSV(e.target.result);
+                    if (controls) {
+                        setRcmData(prev => [...controls, ...prev]);
+                        setImportStatus({ type: 'success', msg: `✓ Imported ${controls.length} controls` });
+                    } else {
+                        setImportStatus({ type: 'error', msg: '✗ Could not parse CSV. Check column headers.' });
+                    }
+                    setTimeout(() => setImportStatus(null), 4000);
+                };
+                reader.readAsText(file);
+            }, []);
+
+            const onDrop = useCallback((e) => {
+                e.preventDefault(); setDragOver(false);
+                const file = e.dataTransfer.files[0];
+                if (file) handleFileImport(file);
+            }, [handleFileImport]);
+
+            // ── Saved Scenarios ──
+            const saveScenario = () => {
+                if (!newScenarioName.trim()) return;
+                const s = { id: Date.now(), name: newScenarioName, hubStrategy, scenario, levers: { ...levers }, rcmData: JSON.parse(JSON.stringify(rcmData)), createdAt: new Date().toLocaleDateString() };
+                setSavedScenarios(prev => [s, ...prev]);
+                setNewScenarioName('');
+                setSaveModalOpen(false);
+            };
+            const loadScenario = (s) => { setHubStrategy(s.hubStrategy); setScenario(s.scenario); setLevers(s.levers); setRcmData(s.rcmData); };
+            const deleteScenario = (id) => setSavedScenarios(prev => prev.filter(s => s.id !== id));
+
+            const ScenarioBadge = ({ val }) => {
+                const colors = { best: 'bg-emerald-100 text-emerald-700', base: 'bg-blue-100 text-blue-700', worst: 'bg-rose-100 text-rose-700' };
+                return <span className={`scenario-badge ${colors[val]}`}>{val}</span>;
+            };
+
+            return (
+                <div className="min-h-screen pb-20">
+                    {/* ── Print Header (only visible when printing) ── */}
+                    <div className="print-only px-12 pt-8 pb-4 border-b border-slate-200 mb-8">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h1 className="text-3xl font-black text-slate-900">Radix Shift</h1>
+                                <p className="text-sm text-slate-500 mt-1">Controls Transformation ROI Summary · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">Hub Strategy</p>
+                                <p className="text-sm font-black text-slate-700">{hubStrategy === 'single' ? 'Pilot Hub' : 'Global Hub'} · <span className="capitalize">{scenario}</span> Case</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── Nav ── */}
+                    <nav className="nav-blur sticky top-0 z-50 px-8 py-5 flex justify-between items-center no-print">
+                        <div className="flex flex-col">
+                            <span className="text-xl font-black text-slate-900 leading-none">Radix Shift</span>
+                            <span className="text-[10px] font-bold text-indigo-500 mt-1 uppercase tracking-widest leading-none">Unified ROI Master v81.0</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {/* Scenario selector */}
+                            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+                                {['best','base','worst'].map(s => (
+                                    <button key={s} onClick={() => setScenario(s)} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all ${scenario === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>{s}</button>
+                                ))}
+                            </div>
+                            {/* Save / Load */}
+                            <button onClick={() => setSaveModalOpen(true)} className="no-print px-4 py-2 rounded-xl text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">Save Scenario</button>
+                            {/* Export */}
+                            <button onClick={triggerPrint} className="no-print px-4 py-2 rounded-xl text-[10px] font-black text-white bg-slate-800 hover:bg-slate-700 transition-all">Export PDF</button>
+                            {/* Nav tabs */}
+                            <div className="flex gap-1">
+                                {['home', 'ingest', 'config', 'scenarios'].map(v => (
+                                    <button key={v} onClick={() => setView(v)} className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${view === v ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50'}`}>
+                                        {v === 'ingest' ? 'Architect' : v === 'scenarios' ? 'Scenarios' : v.charAt(0).toUpperCase() + v.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* ── Persistent auto-save indicator ── */}
+                    <div className="no-print fixed bottom-6 right-6 z-50 bg-white border border-slate-200 rounded-2xl px-4 py-2 shadow-lg flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Auto-saved</span>
+                    </div>
+
+                    {/* ── Import status toast ── */}
+                    {importStatus && (
+                        <div className={`no-print fixed top-24 right-6 z-50 px-5 py-3 rounded-2xl text-xs font-bold shadow-xl ${importStatus.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                            {importStatus.msg}
+                        </div>
+                    )}
+
+                    {/* ── Save Scenario Modal ── */}
+                    {saveModalOpen && (
+                        <div className="no-print fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setSaveModalOpen(false)}>
+                            <div className="bg-white rounded-3xl p-8 shadow-2xl w-96 space-y-5" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Save Current Scenario</h3>
+                                <p className="text-[11px] text-slate-500">Saves all controls, levers, hub strategy, and scenario mode.</p>
+                                <input
+                                    autoFocus
+                                    value={newScenarioName}
+                                    onChange={e => setNewScenarioName(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && saveScenario()}
+                                    placeholder="e.g. KDP Pilot Hub — Conservative"
+                                    className="input-box text-sm"
+                                />
+                                <div className="flex gap-3">
+                                    <button onClick={saveScenario} className="flex-1 bg-indigo-600 text-white px-5 py-3 rounded-2xl text-xs font-bold hover:bg-indigo-700 transition-all">Save</button>
+                                    <button onClick={() => setSaveModalOpen(false)} className="flex-1 bg-slate-100 text-slate-600 px-5 py-3 rounded-2xl text-xs font-bold hover:bg-slate-200 transition-all">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <main className="max-w-6xl mx-auto px-6 mt-12 space-y-12">
+
+                        {/* ════════════ HOME ════════════ */}
+                        {view === 'home' && (
+                            <div className="space-y-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="stat-card bg-emerald-50 border border-emerald-100">
+                                        <p className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2">Annual Transformation Dividend</p>
+                                        <p className="text-5xl font-black text-slate-900 tracking-tight">{fmt(analysis.totalDiv)}</p>
+                                        <p className="text-[10px] text-emerald-600/60 mt-4 font-bold">Projected Net Value Realization</p>
+                                    </div>
+                                    <div className="stat-card bg-blue-50 border border-blue-100">
+                                        <p className="text-[11px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2">Internal Capacity Reclaimed</p>
+                                        <p className="text-5xl font-black text-slate-900 tracking-tight">{Math.round(analysis.totalCapReclaimed / levers.fteWorkingHours)} <span className="text-2xl">FTE</span></p>
+                                        <p className="text-[10px] text-blue-600/60 mt-4 font-bold">Hours Refocused on Strategic Risk</p>
+                                    </div>
+                                </div>
+
+                                <div className="card-ui p-10 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-6 shadow-2xl relative overflow-hidden">
+                                    <div className="relative z-10">
+                                        <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Baseline Friction Debt</p>
+                                        <p className="text-4xl font-black">{fmt(analysis.totalDebt)}</p>
+                                        <p className="text-[10px] text-slate-400 mt-2">Hub Savings: <span className="text-emerald-400 font-black">{fmt(analysis.hubSavings)}</span> · Automation Savings: <span className="text-indigo-400 font-black">{fmt(analysis.autoSavings)}</span></p>
+                                    </div>
+                                    <div className="flex bg-slate-800 p-1.5 rounded-2xl gap-1 relative z-10 shadow-inner">
+                                        <button onClick={() => setHubStrategy('single')} className={`px-8 py-2.5 rounded-xl text-[10px] font-black transition-all ${hubStrategy === 'single' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>PILOT HUB</button>
+                                        <button onClick={() => setHubStrategy('dual')} className={`px-8 py-2.5 rounded-xl text-[10px] font-black transition-all ${hubStrategy === 'dual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>GLOBAL HUB</button>
+                                    </div>
+                                </div>
+
+                                {/* Waterfall chart */}
+                                <WaterfallChart
+                                    totalDebt={analysis.totalDebt}
+                                    hubSavings={analysis.hubSavings}
+                                    autoSavings={analysis.autoSavings}
+                                    totalDiv={analysis.totalDiv}
+                                />
+
+                                {/* Top controls by Node Dividend */}
+                                {analysis.processed.filter(p => p.nodeDiv > 0).length > 0 && (
+                                    <div className="card-ui p-8">
+                                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6">Top Controls by Node Dividend</h3>
+                                        <div className="space-y-3">
+                                            {[...analysis.processed].sort((a,b) => b.nodeDiv - a.nodeDiv).slice(0,5).map(c => (
+                                                <div key={c.id} className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-[9px] font-black text-indigo-600">{c.controlName?.slice(0,4)}</div>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-800">{c.controlName}</p>
+                                                            <p className="text-[10px] text-slate-400">{c.process} · {c.country}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        {c.status === 'Shared Service' && <span className="scenario-badge bg-emerald-100 text-emerald-700">Hub</span>}
+                                                        {c.nature === 'Automated' && <span className="scenario-badge bg-indigo-100 text-indigo-700">Auto</span>}
+                                                        <span className="text-sm font-black text-emerald-600">{fmt(c.nodeDiv)}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ════════════ ARCHITECT ════════════ */}
+                        {view === 'ingest' && (
+                            <div className="space-y-10">
+                                <div className="flex flex-wrap justify-between items-center gap-4">
+                                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Control DNA Workbench</h2>
+                                    <div className="flex gap-3 items-center">
+                                        {/* CSV drop zone button */}
+                                        <div
+                                            className={`drop-zone ${dragOver ? 'drag-over' : ''} py-3 px-5 text-[11px] font-bold text-indigo-600 flex items-center gap-2`}
+                                            style={{ borderRadius: '16px', padding: '10px 18px' }}
+                                            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                                            onDragLeave={() => setDragOver(false)}
+                                            onDrop={onDrop}
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                                            Import CSV
+                                        </div>
+                                        <input ref={fileInputRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => handleFileImport(e.target.files[0])} />
+                                        <button onClick={addControl} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">+ Add Control</button>
+                                    </div>
+                                </div>
+
+                                {/* CSV format hint */}
+                                <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100">
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">CSV Import Format</p>
+                                    <p className="text-[10px] text-indigo-500 font-medium">Expected headers (case-insensitive): <code className="bg-white px-1 rounded text-indigo-700">controlName, cycle, process, subProcess, activity, country, status, nature, frequency, hoursPerPerformance, iaTodWalkthroughH, iaToeH, complexity, confidence, itSystem, risk, objective</code></p>
+                                </div>
+
+                                {rcmData.map(c => {
+                                    const proc = analysis.processed.find(p => p.id === c.id);
+                                    const confLevel = CONFIDENCE_LEVELS.find(cl => cl.id === (c.confidence || 'high'));
+                                    return (
+                                        <div key={c.id} className="card-ui p-8 space-y-10 border-l-8 border-indigo-100 group">
+                                            <div className="grid grid-cols-4 gap-6 pb-6 border-b border-slate-50">
+                                                <div><label className="field-label">Control ID</label><input value={c.controlName} onChange={e => updateNode(c.id, 'controlName', e.target.value)} className="input-box font-bold text-slate-900" /></div>
+                                                <div><label className="field-label">Cycle & Process</label><p className="text-[11px] font-bold text-slate-400">{c.cycle} › {c.process}</p></div>
+                                                <div><label className="field-label">Frequency</label><select value={c.frequency} onChange={e => updateNode(c.id, 'frequency', e.target.value)} className="input-box">{FREQUENCIES.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}</select></div>
+                                                <div className="text-right">
+                                                    <p className="field-label font-black text-emerald-500 flex items-center justify-end gap-1">
+                                                        Node Dividend
+                                                        <span title="The annual value created by this control's transformation — Hub Saving (local rate vs. SSC rate) plus Automation Saving (IA hours freed). Zero until the control is moved to Hub or set to Automation." style={{cursor:'help', fontSize:'10px', background:'#d1fae5', color:'#059669', borderRadius:'50%', width:'14px', height:'14px', display:'inline-flex', alignItems:'center', justifyContent:'center', fontWeight:900}}>?</span>
+                                                    </p>
+                                                    <p className="text-xl font-black text-emerald-600">{fmt(proc?.nodeDiv || 0)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                                <div className="space-y-6">
+                                                    <label className="field-label">Control Activity Description</label>
+                                                    <textarea value={c.activity} onChange={e => updateNode(c.id, 'activity', e.target.value)} className="input-box h-32 leading-relaxed text-left font-normal" placeholder="Define control procedure..." />
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div><label className="field-label">Risk Mitigated</label><textarea value={c.risk} onChange={e => updateNode(c.id, 'risk', e.target.value)} className="input-box h-16" /></div>
+                                                        <div><label className="field-label">Objective</label><textarea value={c.objective} onChange={e => updateNode(c.id, 'objective', e.target.value)} className="input-box h-16" /></div>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div><label className="field-label">Operator Hrs / Perf.</label><input type="number" step="0.5" value={c.hoursPerPerformance} onChange={e => updateNode(c.id, 'hoursPerPerformance', Number(e.target.value))} className="input-box bg-white" /></div>
+                                                        <div><label className="field-label">Complexity</label><input type="number" step="0.1" value={c.complexity} onChange={e => updateNode(c.id, 'complexity', Number(e.target.value))} className="input-box bg-white" /></div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div><label className="field-label">IA TOD Walkthrough Hrs</label><input type="number" value={c.iaTodWalkthroughH} onChange={e => updateNode(c.id, 'iaTodWalkthroughH', Number(e.target.value))} className="input-box bg-white" /></div>
+                                                        <div><label className="field-label">IA TOE Hrs</label><input type="number" value={c.iaToeH} onChange={e => updateNode(c.id, 'iaToeH', Number(e.target.value))} className="input-box bg-white" /></div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div><label className="field-label">Geography</label><select value={c.country} onChange={e => updateNode(c.id, 'country', e.target.value)} className="input-box bg-white">{GEOS.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
+                                                        <div><label className="field-label">IT System</label><input value={c.itSystem} onChange={e => updateNode(c.id, 'itSystem', e.target.value)} className="input-box bg-white" /></div>
+                                                    </div>
+                                                    {/* Confidence Level */}
+                                                    <div>
+                                                        <label className="field-label">Confidence Level</label>
+                                                        <div className="flex gap-2 mt-1">
+                                                            {CONFIDENCE_LEVELS.map(cl => (
+                                                                <button key={cl.id} onClick={() => updateNode(c.id, 'confidence', cl.id)}
+                                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${c.confidence === cl.id ? 'text-white border-transparent shadow-md' : 'bg-white text-slate-400 border-slate-200'}`}
+                                                                    style={c.confidence === cl.id ? { background: cl.color } : {}}
+                                                                >{cl.label}</button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-4 pt-8 border-t border-slate-50">
+                                                <button onClick={() => updateNode(c.id, 'status', c.status === 'Shared Service' ? 'Local' : 'Shared Service')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${c.status === 'Shared Service' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-900 text-white'}`}>{c.status === 'Shared Service' ? '✓ In Hub' : 'Move to Hub'}</button>
+                                                <button onClick={() => updateNode(c.id, 'nature', c.nature === 'Automated' ? 'Manual' : 'Automated')} className={`px-8 py-3 rounded-2xl text-[10px] font-black uppercase transition-all ${c.nature === 'Automated' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-400'}`}>{c.nature === 'Automated' ? '✓ Automation On' : 'Set Automation'}</button>
+                                                <button onClick={() => cloneNode(c)} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100">Clone DNA</button>
+                                                <button onClick={() => deleteControl(c.id)} className="ml-auto px-6 py-3 rounded-2xl text-[10px] font-black uppercase bg-rose-50 text-rose-400 border border-rose-100 hover:bg-rose-100 transition-all">Delete</button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* ════════════ CONFIG ════════════ */}
+                        {view === 'config' && (
+                            <div className="space-y-12">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="glossary-card border-l-4 border-indigo-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-indigo-900 mb-2 uppercase tracking-tight">Definition: Local Rate</h3>
+                                        <p className="text-[11px] text-indigo-800 leading-relaxed">The burdened hourly cost of the <b>Business Unit Operator</b> currently performing manual controls. Centralizing to a Hub captures the spread between this rate and the SSC rates.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-emerald-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-emerald-900 mb-2 uppercase tracking-tight">Definition: Internal Rate</h3>
+                                        <p className="text-[11px] text-emerald-800 leading-relaxed">The hourly cost of <b>Internal Audit</b> professionals. This is used to value the capacity buy-back achieved by reducing TOD and TOE manual testing hours.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-amber-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-amber-900 mb-2 uppercase tracking-tight">COE Efficiency Lift (%)</h3>
+                                        <p className="text-[11px] text-amber-800 leading-relaxed">The <b>Industrialization Gain</b>. Represents the % of labor hours saved by centralizing work into 1 specialized center vs. 20 fragmented countries. Scaled down by per-control confidence level.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-rose-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-rose-900 mb-2 uppercase tracking-tight">Auto Test Target (Hrs)</h3>
+                                        <p className="text-[11px] text-rose-800 leading-relaxed">The human-in-the-loop time needed to review Agentic AI output or validate system logic annually. It replaces the heavy manual sampling burden.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-violet-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-violet-900 mb-2 uppercase tracking-tight">Definition: Confidence Level</h3>
+                                        <p className="text-[11px] text-violet-800 leading-relaxed">Per-control confidence that the CoE lift will be achieved. <b>High</b> = 100% of lift, <b>Medium</b> = 75%, <b>Low</b> = 50%. Allows defensible risk-weighting of the portfolio.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-sky-500 shadow-sm">
+                                        <h3 className="text-xs font-black text-sky-900 mb-2 uppercase tracking-tight">Scenario: Best / Base / Worst</h3>
+                                        <p className="text-[11px] text-sky-800 leading-relaxed">Global efficiency multiplier applied across the portfolio. <b>Best</b> = 45%, <b>Base</b> = 35%, <b>Worst</b> = 15%. Select via the nav bar toggles.</p>
+                                    </div>
+                                    <div className="glossary-card border-l-4 border-fuchsia-500 shadow-sm" style={{gridColumn: 'span 2'}}>
+                                        <h3 className="text-xs font-black text-fuchsia-900 mb-2 uppercase tracking-tight">Definition: Node Dividend</h3>
+                                        <p className="text-[11px] text-fuchsia-800 leading-relaxed">The <b>per-control annual value created</b> by transformation — the sum of two components: (1) <b>Hub Saving</b> — the cost difference between performing the control at local BU rates vs. a centralized SSC/CoE at a lower blended rate; and (2) <b>Automation Saving</b> — the Internal Audit hours freed by replacing manual TOD/TOE testing with automated or agentic testing, valued at the Internal Rate. A control shows zero Node Dividend until it is either moved to the Hub or flagged for Automation.</p>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-12 rounded-[3rem] border border-slate-200 grid grid-cols-2 gap-10 shadow-2xl shadow-slate-100">
+                                    {Object.entries(levers).map(([k, v]) => (
+                                        <div key={k} className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                                            <label className="field-label">{k.replace(/([A-Z])/g, ' $1')}</label>
+                                            <input type="number" value={v} onChange={e => setLevers({ ...levers, [k]: Number(e.target.value) })} className="text-3xl font-black bg-transparent outline-none w-full text-indigo-600" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ════════════ SCENARIOS ════════════ */}
+                        {view === 'scenarios' && (
+                            <div className="space-y-10">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Saved Scenarios</h2>
+                                    <button onClick={() => setSaveModalOpen(true)} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl text-xs font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all">+ Save Current</button>
+                                </div>
+
+                                {savedScenarios.length === 0 && (
+                                    <div className="card-ui p-16 text-center space-y-3">
+                                        <p className="text-3xl">📂</p>
+                                        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No scenarios saved yet</p>
+                                        <p className="text-[11px] text-slate-400">Save the current state using "Save Current" or the button in the nav bar.</p>
+                                    </div>
+                                )}
+
+                                <div className="space-y-3">
+                                    {savedScenarios.map(s => {
+                                        const div = (() => {
+                                            let d = 0;
+                                            s.rcmData.forEach(c => {
+                                                const freqMult = FREQUENCIES.find(f => f.id === c.frequency)?.mult || 1;
+                                                const opH = (c.hoursPerPerformance || 0) * freqMult;
+                                                const iaH = (c.iaTodWalkthroughH || 0) + (c.iaToeH || 0);
+                                                const sscRate = s.hubStrategy === 'dual' && c.country === 'India' ? s.levers.asiaSscRate : s.levers.euSscRate;
+                                                const confMult = CONFIDENCE_LEVELS.find(cl => cl.id === (c.confidence || 'high'))?.effMult || 1;
+                                                const netLift = (s.levers.coeEfficiencyLift * confMult) / (c.complexity || 1);
+                                                const sharedCost = (opH * (1 - netLift / 100)) * sscRate;
+                                                const opDiv = c.status === 'Shared Service' ? (opH * s.levers.localRate) - sharedCost : 0;
+                                                const auditDiv = c.nature === 'Automated' ? ((iaH - s.levers.autoTestTarget) * s.levers.internalRate) : 0;
+                                                d += opDiv + auditDiv;
+                                            });
+                                            return d;
+                                        })();
+                                        return (
+                                            <div key={s.id} className="card-ui p-6">
+                                                <div className="flex flex-wrap justify-between items-start gap-4">
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-black text-slate-900">{s.name}</p>
+                                                        <div className="flex gap-2 items-center flex-wrap">
+                                                            <span className="text-[10px] text-slate-400 font-bold">{s.createdAt}</span>
+                                                            <ScenarioBadge val={s.scenario} />
+                                                            <span className="scenario-badge bg-slate-100 text-slate-600">{s.hubStrategy === 'single' ? 'Pilot Hub' : 'Global Hub'}</span>
+                                                            <span className="scenario-badge bg-slate-100 text-slate-600">{s.rcmData.length} controls</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="text-right">
+                                                            <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Dividend</p>
+                                                            <p className="text-lg font-black text-slate-900">{fmt(div)}</p>
+                                                        </div>
+                                                        <button onClick={() => loadScenario(s)} className="px-6 py-2.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black hover:bg-indigo-700 transition-all">Load</button>
+                                                        <button onClick={() => deleteScenario(s.id)} className="px-4 py-2.5 bg-rose-50 text-rose-400 rounded-2xl text-[10px] font-black border border-rose-100 hover:bg-rose-100 transition-all">✕</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
